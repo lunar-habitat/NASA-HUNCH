@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lunar Habitat — Crew Wellbeing Monitor</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body class="dark-theme">
+
+    <header class="site-header" role="banner">
+        <div class="header-brand">
+            <svg class="header-logo" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <polygon points="12,2 22,8.5 22,15.5 12,22 2,15.5 2,8.5" stroke="var(--color-accent)" stroke-width="1.5" fill="var(--color-accent-glow)" />
+            </svg>
+            <h1>Lunar Habitat <span class="subtitle">Crew Wellbeing Monitor</span></h1>
+        </div>
+        <div class="controls-bar">
+            <span class="controls-label text-accent">NASA HUNCH Concept Prototype</span>
+
+            <div class="controls-group">
+                <label for="scenario-select" class="control-label">Scenario</label>
+                <select id="scenario-select" class="control-select">
+                    <option value="baseline">Baseline</option>
+                    <option value="stress">Stress Spike</option>
+                    <option value="sleepDeprived">Sleep Deprived</option>
+                    <option value="exercise">High Activity</option>
+                    <option value="eva">EVA Spacewalk</option>
+                    <option value="microgravity">Microgravity Rest</option>
+                    <option value="emergency">Emergency Alert</option>
+                    <option value="isolation">Social Isolation</option>
+                </select>
+            </div>
+
+            <div class="controls-group controls-group--import">
+                <button id="btn-import" class="control-btn" title="Import CSV or JSON data file">
+                    📂 Import Data
+                </button>
+                <input type="file" id="file-import" accept=".csv,.json" class="sr-only" aria-label="Choose CSV or JSON file to import">
+                <button id="btn-import-help" class="control-btn control-btn--icon" title="Show expected file format" aria-label="File format help">
+                    ?
+                </button>
+                <div id="import-badge" class="import-badge" hidden>
+                    <span id="import-filename" class="import-badge-name"></span>
+                    <button id="btn-import-clear" class="import-badge-clear" title="Clear imported data" aria-label="Clear imported data">✕</button>
+                </div>
+            </div>
+
+            <button id="btn-regenerate" class="control-btn" title="Regenerate simulated data">
+                ↻ Regenerate
+            </button>
+
+            <button id="btn-play-pause" class="control-btn" title="Play/pause real-time simulation">
+                ▶ Play
+            </button>
+
+            <div class="controls-group">
+                <label for="privacy-toggle" class="control-label">Privacy</label>
+                <button id="privacy-toggle" class="control-toggle" role="switch" aria-checked="false" title="Toggle privacy mode — hide exact values">
+                    <span class="toggle-track">
+                        <span class="toggle-thumb"></span>
+                    </span>
+                    <span class="toggle-label">Off</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main id="main-content" class="main-layout">
+        <section id="wristband-panel" class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Wristband Concept</h2>
+                <p class="panel-subtitle">Biometric Sensor Array</p>
+            </div>
+            <div class="wristband-display">
+                <!-- Wristband visualization — Phase 2 -->
+            </div>
+            <div class="sensor-list">
+                <!-- Sensor readings — Phase 2 -->
+            </div>
+            <span class="badge">Simulated sensor readings</span>
+        </section>
+        <section id="dashboard-panel" class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Analytics Dashboard</h2>
+                <p class="panel-subtitle">Real-time Crew Monitoring</p>
+            </div>
+            <div class="kpi-grid">
+                <!-- KPI cards — Phase 3 -->
+            </div>
+            <div class="charts-grid">
+                <!-- Charts — Phase 3 -->
+            </div>
+            <div class="insights-panel">
+                <!-- Insights — Phase 3 -->
+            </div>
+            <p class="placeholder-text">Dashboard metrics loading...</p>
+        </section>
+    </main>
+
+    <!-- Import format help popover -->
+    <div id="import-help-popover" class="import-help-popover" hidden role="dialog" aria-label="Data import format help">
+        <div class="import-help-content">
+            <div class="import-help-header">
+                <strong>Expected File Format</strong>
+                <button id="btn-close-help" class="import-badge-clear" aria-label="Close help">✕</button>
+            </div>
+            <div class="import-help-body">
+                <p><strong>CSV</strong> — first row must be column headers, comma-separated.</p>
+                <p><strong>JSON</strong> — array of objects, or <code>{ "data": [...] }</code>.</p>
+                <table class="import-help-table">
+                    <thead><tr><th>Column</th><th>Range</th><th>Required</th></tr></thead>
+                    <tbody>
+                        <tr><td>timestamp</td><td>ISO 8601</td><td>No</td></tr>
+                        <tr><td>heartRateBpm</td><td>40–180</td><td>Yes*</td></tr>
+                        <tr><td>hrvMs</td><td>10–150</td><td>Yes*</td></tr>
+                        <tr><td>edaMicrosiemens</td><td>0.1–10.0</td><td>Yes*</td></tr>
+                        <tr><td>skinTempC</td><td>30.0–38.0</td><td>Yes*</td></tr>
+                        <tr><td>activityScore</td><td>0–100</td><td>Yes*</td></tr>
+                        <tr><td>sleepMinutes</td><td>0–600</td><td>Yes*</td></tr>
+                        <tr><td>restlessnessScore</td><td>0–100</td><td>Yes*</td></tr>
+                        <tr><td>voiceStressIndex</td><td>0–100</td><td>No</td></tr>
+                        <tr><td>pupilDilationMm</td><td>2.0–8.0</td><td>No</td></tr>
+                        <tr><td>socialScore</td><td>0–100</td><td>No</td></tr>
+                        <tr><td>routineDeviation</td><td>0–100</td><td>No</td></tr>
+                        <tr><td>cognitiveLoad</td><td>0–100</td><td>No</td></tr>
+                        <tr><td>sleepQuality</td><td>0–100</td><td>No</td></tr>
+                        <tr><td>circadianAlignment</td><td>0–100</td><td>No</td></tr>
+                        <tr><td>lightSpectrumScore</td><td>0–100</td><td>No</td></tr>
+                        <tr><td>greeneryExposureMin</td><td>0–120</td><td>No</td></tr>
+                        <tr><td>natureSoundscapeScore</td><td>0–100</td><td>No</td></tr>
+                        <tr><td>windowSimStatus</td><td>0–100</td><td>No</td></tr>
+                    </tbody>
+                </table>
+                <p class="import-help-note">*At least one biometric column is required. Missing columns use defaults. Aliases accepted: hr, hrv, eda, temp, activity, sleep, restlessness, voice, pupil, social, routine, cognitive, circadian, spectrum, greenery, soundscape, window.</p>
+                <p><a href="sample-data.csv" download class="import-help-link">⬇ Download sample CSV template</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import toast notifications -->
+    <div id="import-toast" class="import-toast" hidden role="alert" aria-live="assertive"></div>
+
+    <footer class="site-footer">
+        Concept prototype — simulated data only. Not medical advice or diagnostic tool.
+    </footer>
+
+    <div id="a11y-live" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+
+    <noscript>
+        <p>JavaScript is required to run the Lunar Habitat Crew Wellbeing Monitor. Please enable JavaScript in your browser.</p>
+    </noscript>
+
+    <script type="module" src="scripts/app.js"></script>
+</body>
+</html>
