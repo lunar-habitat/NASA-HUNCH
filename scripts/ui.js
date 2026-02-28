@@ -18,31 +18,37 @@ const SENSOR_INFO = [
     {
         id: 'hr', name: 'Heart Rate', icon: '♥',
         unit: 'bpm', range: '55–140', key: 'heartRateBpm',
+        color: '#ef4444',
         why: 'Tracks cardiovascular response to stress, exercise, and rest cycles'
     },
     {
         id: 'hrv', name: 'Heart Rate Variability', icon: '📊',
         unit: 'ms', range: '20–120', key: 'hrvMs',
+        color: '#f472b6',
         why: 'Indicates autonomic nervous system balance; low HRV correlates with stress'
     },
     {
         id: 'eda', name: 'Electrodermal Activity', icon: '⚡',
         unit: 'µS', range: '0.5–8.0', key: 'edaMicrosiemens',
+        color: '#facc15',
         why: 'Measures sympathetic nervous system arousal; spikes indicate stress response'
     },
     {
         id: 'temp', name: 'Skin Temperature', icon: '🌡',
         unit: '°C', range: '32.0–36.5', key: 'skinTempC',
+        color: '#fb923c',
         why: 'Peripheral temperature shifts reflect circadian rhythm and stress'
     },
     {
         id: 'activity', name: 'Activity Level', icon: '🏃',
         unit: 'score 0–100', range: '0–100', key: 'activityScore',
+        color: '#34d399',
         why: 'Quantifies movement intensity; essential for exercise tracking and sedentary alerts'
     },
     {
         id: 'sleep', name: 'Sleep Quality', icon: '😴',
         unit: 'hours + score', range: '0–480 min', key: 'sleepMinutes',
+        color: '#818cf8',
         why: 'Derived from HR, HRV, and movement; critical for cognitive performance'
     }
 ];
@@ -347,15 +353,50 @@ function buildWristbandSVG(sample) {
     const sleepH = formatNumber(sample.sleepMinutes / 60, 1);
     const actLabel = sample.activityScore > 50 ? 'Active' : 'Rest';
 
-    // Build hotspot circles
+    // Build per-sensor radial gradient + glow filter defs
+    const hotspotDefs = SENSOR_INFO.map(s => {
+        const c = s.color;
+        return `
+        <radialGradient id="hsGrad_${s.id}" cx="40%" cy="35%" r="65%">
+          <stop offset="0%"   stop-color="${c}" stop-opacity="0.9"/>
+          <stop offset="55%"  stop-color="${c}" stop-opacity="0.45"/>
+          <stop offset="100%" stop-color="${c}" stop-opacity="0.1"/>
+        </radialGradient>
+        <filter id="hsGlow_${s.id}" x="-120%" y="-120%" width="340%" height="340%">
+          <feGaussianBlur stdDeviation="4" result="blur"/>
+          <feFlood flood-color="${c}" flood-opacity="0.55" result="color"/>
+          <feComposite in="color" in2="blur" operator="in" result="glow"/>
+          <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>`;
+    }).join('');
+
+    // Build hotspot circles — each wrapped in a <g> with a larger invisible
+    // hit-area circle so hover/click is stable and never jitters.
     const hotspots = SENSOR_INFO.map(s => {
         const p = HOTSPOT_POS[s.id];
-        return `<circle class="sensor-hotspot hotspot-pulse" cx="${p.x}" cy="${p.y}" r="8"
-                  fill="#38bdf8" fill-opacity="0.25" stroke="#38bdf8" stroke-width="1.5"
-                  data-sensor="${s.id}" filter="url(#hotspotGlow)"
-                  tabindex="0" role="button" aria-label="${s.name} sensor, click for details">
+        const c = s.color;
+        return `<g class="sensor-hotspot-group" data-sensor="${s.id}"
+                   tabindex="0" role="button" aria-label="${s.name} sensor, click for details">
                   <title>${s.icon} ${s.name}</title>
-                </circle>`;
+                  <!-- Invisible hit-area (r=22) keeps hover stable -->
+                  <circle cx="${p.x}" cy="${p.y}" r="22"
+                    fill="transparent" stroke="none" class="hotspot-hit-area" />
+                  <!-- Active selection ring (hidden by default) -->
+                  <circle class="hotspot-active-ring" cx="${p.x}" cy="${p.y}" r="20"
+                    fill="none" stroke="${c}" stroke-width="0.5" stroke-opacity="0.2"
+                    stroke-dasharray="3 2" pointer-events="none" opacity="0" />
+                  <!-- Outer ring -->
+                  <circle class="sensor-hotspot-ring" cx="${p.x}" cy="${p.y}" r="11"
+                    fill="none" stroke="${c}" stroke-width="0.75" stroke-opacity="0.3"
+                    pointer-events="none" />
+                  <!-- Visible orb -->
+                  <circle class="sensor-hotspot hotspot-pulse" cx="${p.x}" cy="${p.y}" r="7"
+                    fill="url(#hsGrad_${s.id})" stroke="${c}" stroke-width="1.2"
+                    filter="url(#hsGlow_${s.id})" pointer-events="none" />
+                  <!-- Inner highlight dot -->
+                  <circle cx="${p.x - 2}" cy="${p.y - 2}" r="2"
+                    fill="white" fill-opacity="0.35" pointer-events="none" />
+                </g>`;
     }).join('\n      ');
 
     return `<svg class="wristband-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg"
@@ -364,74 +405,69 @@ function buildWristbandSVG(sample) {
       <!-- ===== Definitions ===== -->
       <defs>
         <linearGradient id="wbBandGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stop-color="#2a3040"/>
-          <stop offset="50%"  stop-color="#1a1f2e"/>
-          <stop offset="100%" stop-color="#12161f"/>
+          <stop offset="0%"   stop-color="#2e3548"/>
+          <stop offset="50%"  stop-color="#1e2435"/>
+          <stop offset="100%" stop-color="#141925"/>
         </linearGradient>
         <linearGradient id="wbFaceGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stop-color="#252d3d"/>
-          <stop offset="100%" stop-color="#1a1f2e"/>
+          <stop offset="0%"   stop-color="#2a3350"/>
+          <stop offset="100%" stop-color="#181e30"/>
         </linearGradient>
         <linearGradient id="wbScreenGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stop-color="#0a1628"/>
-          <stop offset="100%" stop-color="#0d1f30"/>
+          <stop offset="0%"   stop-color="#080e1e"/>
+          <stop offset="100%" stop-color="#0c1828"/>
         </linearGradient>
         <!-- Device glow -->
         <filter id="deviceGlow" x="-30%" y="-30%" width="160%" height="160%">
-          <feGaussianBlur stdDeviation="6" result="blur"/>
-          <feFlood flood-color="#38bdf8" flood-opacity="0.25" result="color"/>
+          <feGaussianBlur stdDeviation="7" result="blur"/>
+          <feFlood flood-color="#38bdf8" flood-opacity="0.18" result="color"/>
           <feComposite in="color" in2="blur" operator="in" result="glow"/>
           <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
-        <!-- Hotspot glow -->
-        <filter id="hotspotGlow" x="-100%" y="-100%" width="300%" height="300%">
-          <feGaussianBlur stdDeviation="3" result="blur"/>
-          <feFlood flood-color="#38bdf8" flood-opacity="0.6" result="color"/>
-          <feComposite in="color" in2="blur" operator="in" result="glow"/>
-          <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
+        <!-- Per-sensor hotspot defs -->
+        ${hotspotDefs}
       </defs>
 
       <!-- ===== Band straps ===== -->
       <path d="M28,86 Q52,76 122,76 L122,124 Q52,124 28,114 Z"
-            fill="url(#wbBandGrad)" stroke="#38bdf8" stroke-width="0.5" stroke-opacity="0.3"/>
+            fill="url(#wbBandGrad)" stroke="#38bdf8" stroke-width="0.6" stroke-opacity="0.25"/>
       <path d="M278,76 Q348,76 372,86 L372,114 Q348,124 278,124 Z"
-            fill="url(#wbBandGrad)" stroke="#38bdf8" stroke-width="0.5" stroke-opacity="0.3"/>
+            fill="url(#wbBandGrad)" stroke="#38bdf8" stroke-width="0.6" stroke-opacity="0.25"/>
 
       <!-- Clasp accents -->
       <rect x="24" y="89" width="14" height="22" rx="4"
-            fill="#2a3040" stroke="#38bdf8" stroke-width="0.4" stroke-opacity="0.4"/>
+            fill="#242b3d" stroke="#4a90b8" stroke-width="0.5" stroke-opacity="0.35"/>
       <rect x="362" y="89" width="14" height="22" rx="4"
-            fill="#2a3040" stroke="#38bdf8" stroke-width="0.4" stroke-opacity="0.4"/>
+            fill="#242b3d" stroke="#4a90b8" stroke-width="0.5" stroke-opacity="0.35"/>
 
       <!-- Band accent lines -->
-      <line x1="52" y1="94" x2="118" y2="94" stroke="#38bdf8" stroke-width="0.5" stroke-opacity="0.15"/>
-      <line x1="52" y1="106" x2="118" y2="106" stroke="#38bdf8" stroke-width="0.5" stroke-opacity="0.15"/>
-      <line x1="282" y1="94" x2="348" y2="94" stroke="#38bdf8" stroke-width="0.5" stroke-opacity="0.15"/>
-      <line x1="282" y1="106" x2="348" y2="106" stroke="#38bdf8" stroke-width="0.5" stroke-opacity="0.15"/>
+      <line x1="52" y1="94" x2="118" y2="94" stroke="#38bdf8" stroke-width="0.4" stroke-opacity="0.12"/>
+      <line x1="52" y1="106" x2="118" y2="106" stroke="#38bdf8" stroke-width="0.4" stroke-opacity="0.12"/>
+      <line x1="282" y1="94" x2="348" y2="94" stroke="#38bdf8" stroke-width="0.4" stroke-opacity="0.12"/>
+      <line x1="282" y1="106" x2="348" y2="106" stroke="#38bdf8" stroke-width="0.4" stroke-opacity="0.12"/>
 
       <!-- ===== Device face ===== -->
       <rect x="118" y="40" width="164" height="120" rx="14"
-            fill="url(#wbFaceGrad)" stroke="#38bdf8" stroke-width="1" stroke-opacity="0.5"
+            fill="url(#wbFaceGrad)" stroke="#38bdf8" stroke-width="0.8" stroke-opacity="0.4"
             filter="url(#deviceGlow)"/>
       <!-- Inner bezel -->
       <rect x="126" y="48" width="148" height="104" rx="10"
-            fill="none" stroke="#38bdf8" stroke-width="0.4" stroke-opacity="0.2"/>
+            fill="none" stroke="#38bdf8" stroke-width="0.35" stroke-opacity="0.15"/>
 
       <!-- ===== Screen ===== -->
       <rect x="131" y="54" width="138" height="92" rx="6"
-            fill="url(#wbScreenGrad)" stroke="#38bdf8" stroke-width="0.5" stroke-opacity="0.3"/>
+            fill="url(#wbScreenGrad)" stroke="#4a90b8" stroke-width="0.5" stroke-opacity="0.25"/>
 
       <!-- ===== Screen readout ===== -->
-      <g class="device-screen-text" font-family="'JetBrains Mono','Fira Code',monospace" fill="#38bdf8">
-        <text x="143" y="68" font-size="7.5" fill="#94a3b8" opacity="0.5">${AppState.privacyMode ? 'PRIVATE' : 'SIMULATED'}</text>
-        <text x="143" y="84" font-size="10">♥ ${AppState.privacyMode ? '---' : Math.round(sample.heartRateBpm)} <tspan fill="#94a3b8" font-size="7">bpm</tspan></text>
-        <text x="216" y="84" font-size="9">HRV ${AppState.privacyMode ? '---' : Math.round(sample.hrvMs)}<tspan fill="#94a3b8" font-size="7">ms</tspan></text>
-        <text x="143" y="100" font-size="10">⚡${AppState.privacyMode ? '---' : formatNumber(sample.edaMicrosiemens, 1)} <tspan fill="#94a3b8" font-size="7">µS</tspan></text>
-        <text x="216" y="100" font-size="9">🌡${AppState.privacyMode ? '---' : formatNumber(sample.skinTempC, 1)}<tspan fill="#94a3b8" font-size="7">°C</tspan></text>
-        <text x="143" y="116" font-size="10">🏃 ${AppState.privacyMode ? '---' : actLabel}</text>
-        <text x="216" y="116" font-size="9">😴 ${AppState.privacyMode ? '---' : sleepH}<tspan fill="#94a3b8" font-size="7">h</tspan></text>
-        <text x="143" y="140" font-size="6" fill="#94a3b8" opacity="0.45">LUNAR HABITAT MONITOR</text>
+      <g class="device-screen-text" font-family="'JetBrains Mono','Fira Code',monospace" fill="#c8d6e5">
+        <text x="143" y="68" font-size="7.5" fill="#7a8ba0" letter-spacing="1.5" opacity="0.7">${AppState.privacyMode ? 'PRIVATE' : 'SIMULATED'}</text>
+        <text x="143" y="84" font-size="10"><tspan fill="#ef4444">♥</tspan> ${AppState.privacyMode ? '---' : Math.round(sample.heartRateBpm)} <tspan fill="#6b7f96" font-size="7">bpm</tspan></text>
+        <text x="216" y="84" font-size="9"><tspan fill="#f472b6">HRV</tspan> ${AppState.privacyMode ? '---' : Math.round(sample.hrvMs)}<tspan fill="#6b7f96" font-size="7">ms</tspan></text>
+        <text x="143" y="100" font-size="10"><tspan fill="#facc15">⚡</tspan>${AppState.privacyMode ? '---' : formatNumber(sample.edaMicrosiemens, 1)} <tspan fill="#6b7f96" font-size="7">µS</tspan></text>
+        <text x="216" y="100" font-size="9">🌡${AppState.privacyMode ? '---' : formatNumber(sample.skinTempC, 1)}<tspan fill="#6b7f96" font-size="7">°C</tspan></text>
+        <text x="143" y="116" font-size="10"><tspan fill="#34d399">🏃</tspan> ${AppState.privacyMode ? '---' : actLabel}</text>
+        <text x="216" y="116" font-size="9"><tspan fill="#818cf8">😴</tspan> ${AppState.privacyMode ? '---' : sleepH}<tspan fill="#6b7f96" font-size="7">h</tspan></text>
+        <text x="143" y="140" font-size="6" fill="#5a6a7e" letter-spacing="1" opacity="0.55">LUNAR HABITAT MONITOR</text>
       </g>
 
       <!-- ===== Sensor hotspots ===== -->
@@ -480,14 +516,17 @@ function buildSensorCards(container, sample) {
  * Attach click and keyboard handlers on SVG hotspots to highlight corresponding sensor cards.
  */
 function attachHotspotHandlers() {
-    document.querySelectorAll('.sensor-hotspot').forEach(hotspot => {
-        hotspot.style.cursor = 'pointer';
+    document.querySelectorAll('.sensor-hotspot-group').forEach(hotspot => {
 
         const handleActivate = () => {
             const sensorId = hotspot.getAttribute('data-sensor');
 
-            // Remove active state from every card
+            // Remove active state from every hotspot and card
+            document.querySelectorAll('.sensor-hotspot-group').forEach(g => g.classList.remove('active'));
             document.querySelectorAll('.sensor-card').forEach(c => c.classList.remove('active'));
+
+            // Highlight the clicked hotspot
+            hotspot.classList.add('active');
 
             // Highlight the matching card and scroll to it
             const card = document.querySelector(`.sensor-card[data-sensor="${sensorId}"]`);
@@ -856,6 +895,36 @@ function initControls() {
         });
     }
 
+    // Background music toggle
+    const musicToggle = document.getElementById('music-toggle');
+    if (musicToggle) {
+        const bgMusic = new Audio('assets/audio/the_mountain-space-438391.mp3');
+        bgMusic.loop = true;
+        bgMusic.volume = 0.35;
+        let musicPlaying = false;
+
+        musicToggle.addEventListener('click', () => {
+            musicPlaying = !musicPlaying;
+            musicToggle.setAttribute('aria-checked', String(musicPlaying));
+            musicToggle.classList.toggle('music-toggle--active', musicPlaying);
+            musicToggle.querySelector('.music-icon').textContent = musicPlaying ? '🔊' : '🔇';
+
+            if (musicPlaying) {
+                bgMusic.play().catch(err => {
+                    console.warn('[UI] Audio play blocked:', err.message);
+                    musicPlaying = false;
+                    musicToggle.setAttribute('aria-checked', 'false');
+                    musicToggle.classList.remove('music-toggle--active');
+                    musicToggle.querySelector('.music-icon').textContent = '🔇';
+                });
+            } else {
+                bgMusic.pause();
+            }
+            announce(`Background music ${musicPlaying ? 'on' : 'off'}`);
+            console.log(`[UI] Music: ${musicPlaying ? 'ON' : 'OFF'}`);
+        });
+    }
+
     console.log('[UI] Controls initialized');
 }
 
@@ -1051,13 +1120,13 @@ export function renderWristband() {
             const linksWrap = createElement('div', 'view-3d-links');
 
             const link = createElement('a', 'view-3d-link control-btn');
-            link.href = 'wristband-3d.html';
+            link.href = 'pages/wristband-3d.html';
             link.textContent = '🧊 Sci-Fi View';
             link.title = 'Open interactive 3D wristband explorer';
             linksWrap.appendChild(link);
 
             const prodLink = createElement('a', 'view-3d-link control-btn');
-            prodLink.href = 'wristband-product.html';
+            prodLink.href = 'pages/wristband-product.html';
             prodLink.textContent = '🎨 Product View';
             prodLink.title = 'Open photorealistic product render';
             linksWrap.appendChild(prodLink);

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lunar Habitat — Product View</title>
+    <link rel="stylesheet" href="../styles/main.css">
+    <link rel="stylesheet" href="../styles/wristband-product.css">
+</head>
+<body class="dark-theme">
+
+    <!-- Loading overlay (while HDR loads) -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner-ring"></div>
+        <p class="loading-text">Loading environment…</p>
+    </div>
+
+    <canvas id="product-canvas"></canvas>
+
+    <div id="hud-overlay">
+        <!-- Top-left: branding + controls -->
+        <div class="hud-top-left">
+            <div class="hud-panel">
+                <div class="hud-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <polygon points="12,2 22,8.5 22,15.5 12,22 2,15.5 2,8.5" stroke="var(--color-accent)" stroke-width="1.5" fill="var(--color-accent-glow)" />
+                    </svg>
+                    Product View
+                </div>
+                <div class="hud-subtitle">Lunar Habitat Wristband — Concept Render</div>
+
+                <div class="hud-row">
+                    <label for="scenario-select-product" class="hud-label">Scenario</label>
+                    <select id="scenario-select-product" class="control-select">
+                        <option value="baseline">Baseline</option>
+                        <option value="stress">Stress Spike</option>
+                        <option value="sleepDeprived">Sleep Deprived</option>
+                        <option value="exercise">High Activity</option>
+                        <option value="eva">EVA Spacewalk</option>
+                        <option value="microgravity">Microgravity Rest</option>
+                        <option value="emergency">Emergency Alert</option>
+                        <option value="isolation">Social Isolation</option>
+                    </select>
+                </div>
+
+                <div class="hud-links">
+                    <a href="../index.html" class="hud-link">← Dashboard</a>
+                    <a href="wristband-3d.html" class="hud-link">🧊 Sci-Fi View</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top-right: auto-rotate toggle -->
+        <div class="hud-top-right">
+            <button id="btn-auto-rotate" class="toggle-btn active" title="Toggle auto-rotate">⟳ Auto-Rotate</button>
+        </div>
+
+        <!-- Bottom-center: color variant picker -->
+        <div class="hud-bottom-center">
+            <div class="hud-panel variant-picker">
+                <span class="variant-picker-label">Finish</span>
+                <button class="variant-swatch active" data-variant="spaceGray" data-name="Space Gray" style="background: #3a3a3c;" aria-label="Space Gray"></button>
+                <button class="variant-swatch" data-variant="silver" data-name="Silver" style="background: linear-gradient(135deg, #e8e8ed, #c7c7cc);" aria-label="Silver"></button>
+                <button class="variant-swatch" data-variant="midnight" data-name="Midnight" style="background: #1c1c1e;" aria-label="Midnight"></button>
+                <button class="variant-swatch" data-variant="starlight" data-name="Starlight" style="background: linear-gradient(135deg, #faf6f2, #e8dfd6);" aria-label="Starlight"></button>
+            </div>
+        </div>
+
+        <!-- Bottom-left hint -->
+        <div class="hud-hint" id="hud-hint">Click + drag to rotate · Scroll to zoom</div>
+    </div>
+
+    <div id="a11y-live" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.172.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.172.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module" src="../scripts/wristband-product.js"></script>
+</body>
+</html>

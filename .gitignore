@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/settings.json
+
+# Dependencies (safety net)
+node_modules/
+
+# Build artifacts
+dist/
+build/
