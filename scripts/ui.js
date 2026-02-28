@@ -1416,7 +1416,10 @@ function toggleAccordion(systemId) {
     if (!isOpen) {
         section.classList.add('is-open');
         header.setAttribute('aria-expanded', 'true');
-        if (body) body.style.maxHeight = body.scrollHeight + 'px';
+        if (body) {
+            body.classList.remove('transition-done');
+            body.style.maxHeight = body.scrollHeight + 'px';
+        }
         if (chevron) chevron.textContent = '▾';
 
         // Render charts lazily on first open
@@ -1428,13 +1431,34 @@ function toggleAccordion(systemId) {
             const latestSample = getLatestSample(series);
             renderSystemCharts(systemId, series, chartsContainer, latestSample);
             chartsContainer.dataset.rendered = 'true';
+
+            // Recalculate max-height now that charts have been added
+            if (body) body.style.maxHeight = body.scrollHeight + 'px';
+        }
+
+        // After transition ends, switch to max-height:none so content is never clipped
+        if (body) {
+            const onEnd = () => {
+                body.removeEventListener('transitionend', onEnd);
+                if (section.classList.contains('is-open')) {
+                    body.classList.add('transition-done');
+                }
+            };
+            body.addEventListener('transitionend', onEnd);
         }
 
         announce(`${SYSTEMS.find(s => s.id === systemId)?.name || systemId} section expanded`);
     } else {
+        if (body) {
+            body.classList.remove('transition-done');
+            // Reset to current scrollHeight so the transition animates from the correct value
+            body.style.maxHeight = body.scrollHeight + 'px';
+            // Force reflow before setting to 0
+            void body.offsetHeight;
+            body.style.maxHeight = '0';
+        }
         section.classList.remove('is-open');
         header.setAttribute('aria-expanded', 'false');
-        if (body) body.style.maxHeight = '0';
         if (chevron) chevron.textContent = '▸';
         announce(`${SYSTEMS.find(s => s.id === systemId)?.name || systemId} section collapsed`);
     }

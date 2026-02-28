@@ -800,6 +800,11 @@ body::after {
     padding: var(--space-sm) var(--space-lg) var(--space-lg);
 }
 
+.system-accordion.is-open .system-accordion__body.transition-done {
+    max-height: none;
+    overflow: visible;
+}
+
 .system-accordion__desc {
     font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
