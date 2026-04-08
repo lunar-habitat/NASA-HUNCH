@@ -1,0 +1,29 @@
+NASA Hunch Project:  Lunar Smart Adaptive Habitat Design with AI Psychological Monitoring for Crew Adaptive Positive Mental Health
+
+GOAL: Create a lunar habitat that uses Psychological Research and AI to monitor and support astronaut mental health, while integrating smart building systems for life support and power.
+
+The problem:
+Long lunar missions = isolation, stress, and risk to mental health 
+Current habitats: focus on physical safety, not psychological needs 
+Need: Adaptive, supportive environments for crew well-being Astronauts face unique psychological challenges: isolation, confinement, and stress. Traditional habitats protect physically, but we must also address mental health for mission success.
+
+Technology suggestions to be integrated into habitat design:
+Voice recognition/analysis
+Facial scans (pupils - pupillometer)
+Behavioral Pattern Analysis (No Cameras)
+Monitors: Movement patterns, Social withdrawal or hyper-activity, Changes in daily routines
+Records: Door usage, Workstation interaction, Task completion timing
+Heart Rate Variability (HRV) Monitoring
+Monitors: Stress levels, Emotional regulation, Fatigue and anxiety
+Integrated into wristbands
+Pressure sensors in mattresses
+Monitors: Sleep duration, sleep stages, restlessness, Circadian misalignment
+Using LED technology, the circadian light panel replicates the light spectrum and day-night rhythm of Earth.
+Greenery backgrounds in windows simulating earth like views and sounds
+
+Wrist band features:
+
+Heart Rate & HRV: Optical sensors measure heart rate and Heart Rate Variability; low HRV indicates higher stress, while high HRV reflects relaxation and adaptability.
+Electrodermal Activity (EDA): Skin electrodes detect changes in sweat gland activity, a direct indicator of emotional arousal and stress.
+Skin Temperature: Wrist sensors track subtle temperature changes linked to the body’s fight-or-flight stress response.
+Activity & Sleep Patterns: Motion sensors monitor movement and sleep quality to identify behaviors that contribute to or signal chronic stress.

@@ -1131,6 +1131,12 @@ export function renderWristband() {
             prodLink.title = 'Open photorealistic product render';
             linksWrap.appendChild(prodLink);
 
+            const habitatLink = createElement('a', 'view-3d-link control-btn');
+            habitatLink.href = 'pages/habitat-3d.html';
+            habitatLink.textContent = '🏠 Habitat 3D';
+            habitatLink.title = 'Open 3D lunar habitat simulation';
+            linksWrap.appendChild(habitatLink);
+
             display.appendChild(linksWrap);
         }
     }
