@@ -35,7 +35,6 @@ const METRIC_META = {
     activityScore:      { label: 'Activity',            unit: '',     min: 0,   max: 100, icon: icon('activity'),    color: '#34d399' },
     sleepMinutes:       { label: 'Sleep Duration',      unit: 'min',  min: 0,   max: 600, icon: icon('moonSleep'),   color: '#818cf8' },
     restlessnessScore:  { label: 'Restlessness',        unit: '',     min: 0,   max: 100, icon: icon('restless'),    color: '#f97316' },
-    voiceStressIndex:   { label: 'Voice Stress',        unit: '',     min: 0,   max: 100, icon: icon('mic'),         color: '#f472b6' },
     pupilDilationMm:    { label: 'Pupil Dilation',      unit: 'mm',   min: 2,   max: 8,   icon: icon('eye'),         color: '#c084fc' },
     socialScore:        { label: 'Social Interaction',   unit: '',     min: 0,   max: 100, icon: icon('users'),       color: '#22d3ee' },
     routineDeviation:   { label: 'Routine Deviation',   unit: '',     min: 0,   max: 100, icon: icon('clipboard'),   color: '#fbbf24' },
@@ -50,13 +49,13 @@ const METRIC_META = {
 
 /* Sensor-to-module mapping: which sensors are in which module types */
 const MODULE_SENSORS = {
-    hub:         ['heartRateBpm', 'hrvMs', 'voiceStressIndex', 'cognitiveLoad'],
-    communal:    ['socialScore', 'natureSoundscapeScore'],
+    hub:         ['pupilDilationMm', 'cognitiveLoad'],
+    communal:    ['socialScore', 'routineDeviation'],
     living:      ['sleepMinutes', 'restlessnessScore', 'circadianAlignment'],
-    research:    ['cognitiveLoad', 'pupilDilationMm'],
+    research:    ['cognitiveLoad'],
     cultivating: ['greeneryExposureMin', 'lightSpectrumScore'],
-    mechanical:  ['skinTempC', 'edaMicrosiemens'],
-    containment: ['activityScore', 'windowSimStatus']
+    mechanical:  ['heartRateBpm', 'hrvMs', 'edaMicrosiemens', 'skinTempC'],
+    containment: ['activityScore']
 };
 
 const CIRCADIAN_PRESETS = {
@@ -113,7 +112,7 @@ const state = {
     // Remove module mode
     removeMode: false,
     // Cached references for per-frame animation (avoids scene traversal)
-    _cached: { hotspots: [], holoRings: [], growLights: [], screens: [], particles: [], circadianFixtures: [], toggleAnims: [] }
+    _cached: { hotspots: [], holoRings: [], growLights: [], screens: [], particles: [], circadianFixtures: [], toggleAnims: [], doorScanLines: [], doorCornerNodes: [] }
 };
 
 /* ============================================
@@ -149,7 +148,7 @@ const scene  = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0e17);
 scene.fog        = new THREE.FogExp2(0x0a0e17, 0.008);
 
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500);
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 500);
 camera.position.set(30, 25, 30);
 
 /* CSS2D label renderer */
@@ -969,35 +968,35 @@ const TOUR_WAYPOINTS = [
         target:   [0, 2, 0],
         duration: 5,
         title:    'Welcome to the ASCEND Habitat',
-        text:     'A modular lunar habitat designed for long-duration crew wellbeing monitoring. Each dome is a truncated icosahedron — the geometry of a soccer ball — cut at the equator.'
+        text:     'A modular lunar habitat designed for long-duration crew wellbeing monitoring. At 1/6th Earth gravity, the Moon\'s microgravity environment changes how crew move, sleep, and maintain health — this system tracks those adaptations in real time.'
     },
     {
         position: [8, 6, 8],
         target:   [0, 2, 0],
         title:    'Central Hub',
         duration: 5,
-        text:     'The hub is the command centre and social heart of the habitat. It monitors heart rate, HRV, voice stress, and cognitive load through embedded wristband sensors.'
+        text:     'The social heart of the habitat. In lunar microgravity, crew move with a bounding low-g gait — the central anchor post and perimeter handrails help control momentum and stabilise during interaction. The pupilometer monitors pupil dilation and cognitive load in the common area.'
     },
     {
         position: [18, 5, 3],
         target:   [14, 2, 0],
         duration: 5,
         title:    'Communal Module',
-        text:     'Shared dining and recreation space. Environmental sensors track air quality, CO₂ levels, and social interaction patterns to optimise group wellbeing.'
+        text:     'Shared dining and recreation space. Handrails along the perimeter help crew navigate the low-gravity environment safely. Doorway motion sensors track social interaction patterns and routine deviations to support group wellbeing.'
     },
     {
         position: [-18, 5, -3],
         target:   [-14, 2, 0],
         duration: 5,
         title:    'Living Quarters',
-        text:     'Private berths with mattress-embedded pressure sensors and ambient monitoring. Sleep quality, circadian rhythm, and core temperature are tracked nightly.'
+        text:     'Private berths with sleeping bag pressure sensors. In lunar gravity, crew are anchored in sleeping bags to prevent drifting from low-g movement during sleep. Pressure sensors track sleep duration, stages, restlessness, and circadian alignment throughout each rest cycle.'
     },
     {
         position: [3, 5, 18],
         target:   [0, 2, 14],
         duration: 5,
         title:    'Research Laboratory',
-        text:     'Equipped with a pupillometer for cognitive fatigue detection. Screen-based eye-tracking and EDA sensors monitor researcher stress during experiments.'
+        text:     'Research workstations with an overhead anchor rail to brace against in low gravity during precision tasks. Pupillometry detects cognitive fatigue, while EDA sensors on the wristband monitor stress levels throughout experiment sessions.'
     },
     {
         position: [-3, 5, -18],
@@ -1011,14 +1010,14 @@ const TOUR_WAYPOINTS = [
         target:   [10, 2, 10],
         duration: 5,
         title:    'Mechanical Systems',
-        text:     'Exercise equipment with integrated HRV and EDA sensors. Activity levels and metabolic rates feed into the crew wellbeing index in real time.'
+        text:     'Lunar gravity reduces skeletal load to just 1/6th of Earth\'s, accelerating muscle and bone loss without countermeasures. Exercise equipment here targets that risk directly. HRV wristband sensors monitor cardiovascular effort and recovery in real time.'
     },
     {
         position: [-14, 5, 14],
         target:   [-10, 2, 10],
         duration: 5,
         title:    'Airlock & Containment',
-        text:     'Decontamination and EVA staging area. UV sterilisation dust monitoring and isolation protocol sensors ensure crew safety during ingress/egress.'
+        text:     'EVA staging and decontamination area. Doorway motion sensors at the airlock entrance track activity score and flag deviations from safe ingress/egress protocols. Lunar regolith dust is abrasive and toxic — decontamination here protects the pressurised habitat.'
     },
     {
         position: [0, 12, 30],
@@ -1152,8 +1151,8 @@ function switchViewMode(mode) {
             orbitControls.target.set(0, 2, 0);
             break;
         case 'firstperson':
-            camera.position.set(0, 1.7, 0);
-            camera.lookAt(1, 1.7, 0);
+            camera.position.set(0, 1.85, 0);
+            camera.lookAt(1, 1.85, 0);
             fpControls.lock();
             announce('First-person mode. WASD to move, mouse to look. ESC to exit.');
             break;
@@ -1279,7 +1278,7 @@ function metricStatus(metricKey, value) {
     // Exceptions: HRV and sleep quality where higher is better
     const higherIsBetter = ['hrvMs', 'socialScore', 'sleepQuality', 'circadianAlignment',
         'lightSpectrumScore', 'greeneryExposureMin', 'natureSoundscapeScore', 'windowSimStatus'];
-    const lowerIsBetter = ['edaMicrosiemens', 'restlessnessScore', 'voiceStressIndex',
+    const lowerIsBetter = ['edaMicrosiemens', 'restlessnessScore',
         'routineDeviation', 'cognitiveLoad'];
 
     if (higherIsBetter.includes(metricKey)) {
@@ -1348,7 +1347,7 @@ function onCanvasClick(event) {
 
         // Panel swap on click
         if (obj.userData.isOuterPanel && obj.userData.swappable && state.panelPreset === 'mixed') {
-            togglePanel(obj);
+            togglePanel(obj, event.clientX, event.clientY);
             return;
         }
 
@@ -1369,43 +1368,16 @@ function onCanvasClick(event) {
     }
 }
 
-function togglePanel(panel) {
+function togglePanel(panel, screenX, screenY) {
     const isWindow = panel.userData.panelType === 'window';
     if (isWindow) {
-        panel.material.color.set(0x8a8a8a);
-        panel.material.transmission = 0;
-        panel.material.opacity = 1.0;
-        panel.userData.defaultOpacity = 1.0;
-        panel.userData.panelType = 'opaque';
-        // Remove Earth texture
-        if (panel.material.map) {
-            panel.material.map = null;
-            panel.material.needsUpdate = true;
-        }
-    } else {
-        panel.material.color.set(0x88ccff);
-        panel.material.transmission = 0.6;
-        panel.material.opacity = 0.3;
-        panel.userData.defaultOpacity = 0.3;
-        panel.userData.panelType = 'window';
-        // Apply Earth-view canvas texture
-        applyEarthTexture(panel);
+        // Already a window — show the view selector instead of immediately toggling
+        showViewSelector(panel, screenX ?? window.innerWidth / 2, screenY ?? window.innerHeight / 2);
+        return;
     }
-    if (state.cutaway) panel.material.opacity = 0.15;
-    panel.material.needsUpdate = true;
-
-    // Scale-flip transition animation
-    panel.userData._toggleAnim = { progress: 0, duration: 0.25 };
-    panel.scale.setScalar(0.92);
-    // Register in cached toggle anims
-    if (!state._cached.toggleAnims.includes(panel)) {
-        state._cached.toggleAnims.push(panel);
-    }
-
-    // Refresh positional audio on window panels
-    if (natureBuffer) attachWindowAudio();
-
-    announce(`Panel switched to ${panel.userData.panelType}`);
+    // Opaque → window: apply default Earth view and open selector
+    applyViewToPanel(panel, 'earth');
+    showViewSelector(panel, screenX ?? window.innerWidth / 2, screenY ?? window.innerHeight / 2);
 }
 
 function showModulePanel(obj) {
@@ -1627,6 +1599,8 @@ function cacheAnimatedObjects() {
     c.particles = [];
     c.circadianFixtures = [];
     c.toggleAnims = [];
+    c.doorScanLines = [];
+    c.doorCornerNodes = [];
 
     if (!state.habitatGroup) return;
     state.habitatGroup.traverse(child => {
@@ -1636,6 +1610,8 @@ function cacheAnimatedObjects() {
         if (child.userData.isScreen && child.material) c.screens.push(child);
         if (child.userData.isParticleSystem) c.particles.push(child);
         if (child.userData.isCircadianFixture && child.material) c.circadianFixtures.push(child);
+        if (child.userData.isDoorScanLine && child.material) c.doorScanLines.push(child);
+        if (child.userData.isDoorCornerNode && child.material) c.doorCornerNodes.push(child);
     });
 }
 
@@ -1676,72 +1652,343 @@ function animateInteriors(elapsed) {
 }
 
 /* ============================================
+   Door Sensor Frame Animation
+   ============================================ */
+
+function animateDoorSensors(elapsed) {
+    // Scan lines sweep up and down inside the frame (0.04 → 2.04m)
+    const scanLines = state._cached.doorScanLines;
+    for (let i = 0, len = scanLines.length; i < len; i++) {
+        const sl = scanLines[i];
+        // Offset each frame slightly so they don't all sync
+        const phase = i * 0.61;
+        const t = (Math.sin(elapsed * 0.9 + phase) + 1) * 0.5; // 0..1
+        sl.position.y = 0.1 + t * 1.9;                          // 0.1 → 2.0 m
+        sl.material.opacity = 0.25 + t * 0.45;
+        sl.material.emissiveIntensity = 0.4 + t * 0.4;
+    }
+
+    // Corner nodes pulse green
+    const nodes = state._cached.doorCornerNodes;
+    for (let i = 0, len = nodes.length; i < len; i++) {
+        const n = nodes[i];
+        const phase = i * 0.9;
+        n.material.emissiveIntensity = 0.4 + Math.sin(elapsed * 2.0 + phase) * 0.35;
+    }
+}
+
+/* ============================================
    Earth-View Canvas Texture (for window panels)
    ============================================ */
 
-let _earthTexture = null;
+/* ============================================
+   View Options — per-window environment textures
+   ============================================ */
 
-function getEarthTexture() {
-    if (_earthTexture) return _earthTexture;
+const VIEW_OPTIONS = {
+    earth:    { label: 'Earth',    audio: null,                                    generate: generateEarthTexture },
+    forest:   { label: 'Forest',   audio: '../assets/audio/forest-loop.mp3',       generate: generateForestTexture },
+    ocean:    { label: 'Ocean',    audio: '../assets/audio/ocean-loop.mp3',         generate: generateOceanTexture },
+    mountain: { label: 'Mountain', audio: '../assets/audio/the_mountain-space-438391.mp3', generate: generateMountainTexture },
+    aurora:   { label: 'Aurora',   audio: '../assets/audio/aurora-loop.mp3',        generate: generateAuroraTexture }
+};
 
+const _viewTextures = {};
+
+function getViewTexture(viewId) {
+    if (_viewTextures[viewId]) return _viewTextures[viewId];
+    const tex = VIEW_OPTIONS[viewId]?.generate();
+    if (tex) _viewTextures[viewId] = tex;
+    return tex || null;
+}
+
+function generateEarthTexture() {
     const size = 128;
     const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
+    canvas.width = size; canvas.height = size;
     const ctx = canvas.getContext('2d');
-
-    // Dark space background
-    ctx.fillStyle = '#050510';
-    ctx.fillRect(0, 0, size, size);
-
-    // Earth sphere (blue-green gradient with continents)
-    const cx = size * 0.5;
-    const cy = size * 0.55;
-    const r = size * 0.3;
-    const gradient = ctx.createRadialGradient(cx - r * 0.2, cy - r * 0.2, r * 0.1, cx, cy, r);
-    gradient.addColorStop(0, '#88ccff');
-    gradient.addColorStop(0.4, '#2277bb');
-    gradient.addColorStop(0.7, '#115588');
-    gradient.addColorStop(1, '#051530');
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fillStyle = gradient;
-    ctx.fill();
-
-    // Continent patches (simplified green blobs)
-    ctx.fillStyle = 'rgba(50, 140, 70, 0.6)';
-    ctx.beginPath(); ctx.ellipse(cx - r * 0.2, cy - r * 0.1, r * 0.25, r * 0.15, -0.3, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx + r * 0.3, cy + r * 0.2, r * 0.2, r * 0.3, 0.2, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx - r * 0.4, cy + r * 0.4, r * 0.15, r * 0.1, 0.5, 0, Math.PI * 2); ctx.fill();
-
-    // Atmosphere glow
-    ctx.beginPath();
-    ctx.arc(cx, cy, r + 2, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(100, 180, 255, 0.3)';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    // Scatter a few stars
+    ctx.fillStyle = '#050510'; ctx.fillRect(0, 0, size, size);
+    const cx = size * 0.5, cy = size * 0.55, r = size * 0.3;
+    const g = ctx.createRadialGradient(cx - r * 0.2, cy - r * 0.2, r * 0.1, cx, cy, r);
+    g.addColorStop(0, '#88ccff'); g.addColorStop(0.4, '#2277bb');
+    g.addColorStop(0.7, '#115588'); g.addColorStop(1, '#051530');
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+    ctx.fillStyle = 'rgba(50,140,70,0.6)';
+    ctx.beginPath(); ctx.ellipse(cx - r*0.2, cy - r*0.1, r*0.25, r*0.15, -0.3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + r*0.3, cy + r*0.2, r*0.2,  r*0.3,  0.2,  0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx - r*0.4, cy + r*0.4, r*0.15, r*0.1,  0.5,  0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, r + 2, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(100,180,255,0.3)'; ctx.lineWidth = 3; ctx.stroke();
     for (let i = 0; i < 30; i++) {
-        const sx = Math.random() * size;
-        const sy = Math.random() * size;
-        const dx = sx - cx;
-        const dy = sy - cy;
-        if (Math.sqrt(dx * dx + dy * dy) < r + 5) continue; // Skip if inside Earth
-        ctx.fillStyle = `rgba(255, 255, 255, ${0.3 + Math.random() * 0.5})`;
+        const sx = Math.random() * size, sy = Math.random() * size;
+        if (Math.hypot(sx - cx, sy - cy) < r + 5) continue;
+        ctx.fillStyle = `rgba(255,255,255,${0.3 + Math.random() * 0.5})`;
         ctx.fillRect(sx, sy, 1, 1);
     }
-
-    _earthTexture = new THREE.CanvasTexture(canvas);
-    _earthTexture.wrapS = THREE.ClampToEdgeWrapping;
-    _earthTexture.wrapT = THREE.ClampToEdgeWrapping;
-    return _earthTexture;
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+    return tex;
 }
 
-function applyEarthTexture(panel) {
-    panel.material.map = getEarthTexture();
+function generateForestTexture() {
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    // Night sky gradient
+    const sky = ctx.createLinearGradient(0, 0, 0, size);
+    sky.addColorStop(0, '#05080f'); sky.addColorStop(1, '#0d1a10');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, size, size);
+    // Moon
+    ctx.beginPath(); ctx.arc(size * 0.75, size * 0.18, 8, 0, Math.PI * 2);
+    ctx.fillStyle = '#d4d8c8'; ctx.fill();
+    // Stars
+    for (let i = 0; i < 40; i++) {
+        ctx.fillStyle = `rgba(255,255,255,${0.2 + Math.random() * 0.6})`;
+        ctx.fillRect(Math.random() * size, Math.random() * size * 0.55, 1, 1);
+    }
+    // Tree silhouettes
+    ctx.fillStyle = '#051508';
+    for (let t = 0; t < 14; t++) {
+        const tx = (t / 13) * size + Math.sin(t) * 4;
+        const th = 18 + Math.sin(t * 2.3) * 8;
+        ctx.beginPath();
+        ctx.moveTo(tx, size); ctx.lineTo(tx - 6, size - th * 0.5);
+        ctx.lineTo(tx - 4, size - th * 0.5); ctx.lineTo(tx - 3, size - th * 0.7);
+        ctx.lineTo(tx - 2, size - th * 0.7); ctx.lineTo(tx, size - th);
+        ctx.lineTo(tx + 2, size - th * 0.7); ctx.lineTo(tx + 3, size - th * 0.7);
+        ctx.lineTo(tx + 4, size - th * 0.5); ctx.lineTo(tx + 6, size - th * 0.5);
+        ctx.closePath(); ctx.fill();
+    }
+    // Ground mist
+    const mist = ctx.createLinearGradient(0, size * 0.8, 0, size);
+    mist.addColorStop(0, 'rgba(140,200,140,0)'); mist.addColorStop(1, 'rgba(140,200,140,0.15)');
+    ctx.fillStyle = mist; ctx.fillRect(0, size * 0.8, size, size * 0.2);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+    return tex;
+}
+
+function generateOceanTexture() {
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    // Sky-to-ocean gradient
+    const bg = ctx.createLinearGradient(0, 0, 0, size);
+    bg.addColorStop(0, '#0a1a2e'); bg.addColorStop(0.4, '#1a3a5c'); bg.addColorStop(1, '#0d2a40');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, size, size);
+    // Horizon glow
+    const hor = ctx.createLinearGradient(0, size * 0.38, 0, size * 0.5);
+    hor.addColorStop(0, 'rgba(255,180,80,0.18)'); hor.addColorStop(1, 'rgba(255,180,80,0)');
+    ctx.fillStyle = hor; ctx.fillRect(0, size * 0.38, size, size * 0.12);
+    // Stars
+    for (let i = 0; i < 25; i++) {
+        ctx.fillStyle = `rgba(255,255,255,${0.2 + Math.random() * 0.5})`;
+        ctx.fillRect(Math.random() * size, Math.random() * size * 0.35, 1, 1);
+    }
+    // Wave arcs
+    ctx.strokeStyle = 'rgba(120,200,255,0.3)'; ctx.lineWidth = 1;
+    for (let w = 0; w < 8; w++) {
+        const wy = size * 0.5 + w * (size * 0.065);
+        ctx.beginPath();
+        for (let x = 0; x <= size; x += 4) {
+            const y = wy + Math.sin((x / size) * Math.PI * 4 + w * 0.8) * 2;
+            x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+    }
+    // Caustic sparkles
+    for (let i = 0; i < 20; i++) {
+        ctx.fillStyle = `rgba(200,240,255,${0.2 + Math.random() * 0.3})`;
+        ctx.beginPath();
+        ctx.arc(Math.random() * size, size * 0.5 + Math.random() * size * 0.5, 1, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+    return tex;
+}
+
+function generateMountainTexture() {
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    // Deep purple sky
+    const sky = ctx.createLinearGradient(0, 0, 0, size);
+    sky.addColorStop(0, '#080414'); sky.addColorStop(0.6, '#1a0a30'); sky.addColorStop(1, '#0a0814');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, size, size);
+    // Dense stars
+    for (let i = 0; i < 60; i++) {
+        ctx.fillStyle = `rgba(255,255,255,${0.2 + Math.random() * 0.7})`;
+        ctx.fillRect(Math.random() * size, Math.random() * size * 0.65, Math.random() < 0.15 ? 2 : 1, Math.random() < 0.15 ? 2 : 1);
+    }
+    // Distant planet arc (upper right)
+    ctx.beginPath(); ctx.arc(size * 0.82, size * 0.15, 12, 0, Math.PI * 2);
+    const pg = ctx.createRadialGradient(size * 0.78, size * 0.11, 1, size * 0.82, size * 0.15, 12);
+    pg.addColorStop(0, '#c8a060'); pg.addColorStop(1, '#60380a');
+    ctx.fillStyle = pg; ctx.fill();
+    // Far ridge (dark)
+    ctx.fillStyle = '#100818';
+    ctx.beginPath(); ctx.moveTo(0, size * 0.72);
+    for (let x = 0; x <= size; x += 8) {
+        ctx.lineTo(x, size * 0.72 - Math.abs(Math.sin(x * 0.07) * 14 + Math.sin(x * 0.19) * 7));
+    }
+    ctx.lineTo(size, size); ctx.lineTo(0, size); ctx.closePath(); ctx.fill();
+    // Near ridge (black silhouette)
+    ctx.fillStyle = '#040208';
+    ctx.beginPath(); ctx.moveTo(0, size * 0.85);
+    for (let x = 0; x <= size; x += 6) {
+        ctx.lineTo(x, size * 0.85 - Math.abs(Math.sin(x * 0.05 + 1) * 22 + Math.sin(x * 0.13) * 10));
+    }
+    ctx.lineTo(size, size); ctx.lineTo(0, size); ctx.closePath(); ctx.fill();
+    // Snow caps
+    ctx.fillStyle = 'rgba(220,230,240,0.65)';
+    for (let p = 10; p < size - 10; p += 18) {
+        const py = size * 0.85 - Math.abs(Math.sin(p * 0.05 + 1) * 22 + Math.sin(p * 0.13) * 10);
+        ctx.beginPath(); ctx.ellipse(p, py + 3, 4, 3, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+    return tex;
+}
+
+function generateAuroraTexture() {
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    // Near-black sky
+    ctx.fillStyle = '#020608'; ctx.fillRect(0, 0, size, size);
+    // Aurora bands — teal, green, violet
+    const bands = [
+        { color0: 'rgba(0,220,180,0)',  color1: 'rgba(0,220,180,0.35)', y0: 0.15, y1: 0.45 },
+        { color0: 'rgba(40,255,120,0)', color1: 'rgba(40,255,120,0.2)',  y0: 0.25, y1: 0.6  },
+        { color0: 'rgba(160,60,255,0)', color1: 'rgba(160,60,255,0.2)',  y0: 0.1,  y1: 0.5  }
+    ];
+    for (const band of bands) {
+        const gr = ctx.createLinearGradient(0, size * band.y0, 0, size * band.y1);
+        gr.addColorStop(0, band.color0); gr.addColorStop(0.5, band.color1); gr.addColorStop(1, band.color0);
+        ctx.fillStyle = gr;
+        // Wavy band using clip path
+        ctx.beginPath();
+        for (let x = 0; x <= size; x += 2) {
+            const yOff = Math.sin(x * 0.08 + band.y0 * 10) * size * 0.04;
+            const y = size * band.y0 + yOff;
+            x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        for (let x = size; x >= 0; x -= 2) {
+            const yOff = Math.sin(x * 0.08 + band.y0 * 10) * size * 0.04;
+            const y = size * band.y1 + yOff;
+            ctx.lineTo(x, y);
+        }
+        ctx.closePath(); ctx.fill();
+    }
+    // Sharp stars
+    for (let i = 0; i < 50; i++) {
+        ctx.fillStyle = `rgba(255,255,255,${0.4 + Math.random() * 0.6})`;
+        ctx.fillRect(Math.random() * size, Math.random() * size * 0.85, 1, 1);
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+    return tex;
+}
+
+/* Per-panel audio map: uuid → PositionalAudio node for view audio */
+const _panelViewAudio = new Map();
+
+function applyViewToPanel(panel, viewId) {
+    if (viewId === 'opaque') {
+        // Revert to opaque
+        panel.material.color.set(0x8a8a8a);
+        panel.material.transmission = 0;
+        panel.material.opacity = 1.0;
+        panel.userData.defaultOpacity = 1.0;
+        panel.userData.panelType = 'opaque';
+        panel.userData.viewOption = null;
+        if (panel.material.map) { panel.material.map = null; }
+        // Stop view audio for this panel
+        const pa = _panelViewAudio.get(panel.uuid);
+        if (pa && pa.isPlaying) pa.stop();
+    } else {
+        const opt = VIEW_OPTIONS[viewId];
+        if (!opt) return;
+        panel.material.color.set(0x88ccff);
+        panel.material.transmission = 0.6;
+        panel.material.opacity = 0.3;
+        panel.userData.defaultOpacity = 0.3;
+        panel.userData.panelType = 'window';
+        panel.userData.viewOption = viewId;
+        panel.material.map = getViewTexture(viewId);
+    }
+    if (state.cutaway) panel.material.opacity = 0.15;
     panel.material.needsUpdate = true;
+
+    // Scale-flip transition
+    panel.userData._toggleAnim = { progress: 0, duration: 0.25 };
+    panel.scale.setScalar(0.92);
+    if (!state._cached.toggleAnims.includes(panel)) {
+        state._cached.toggleAnims.push(panel);
+    }
+
+    // Refresh nature audio if global sound is on
+    if (natureBuffer) attachWindowAudio();
+
+    announce(`Window view: ${viewId === 'opaque' ? 'Opaque' : VIEW_OPTIONS[viewId]?.label ?? viewId}`);
 }
+
+/* Show/hide the view selector popup near the clicked screen position */
+const _viewSelectorEl = document.getElementById('view-selector');
+let _viewSelectorPanel = null;
+
+function showViewSelector(panel, screenX, screenY) {
+    _viewSelectorPanel = panel;
+    const el = _viewSelectorEl;
+    if (!el) return;
+
+    // Update active state on buttons
+    const current = panel.userData.viewOption ?? (panel.userData.panelType === 'window' ? 'earth' : 'opaque');
+    el.querySelectorAll('.view-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.view === current);
+    });
+
+    // Position near click, keeping inside viewport
+    const margin = 10;
+    const vpW = window.innerWidth, vpH = window.innerHeight;
+    el.removeAttribute('hidden');
+    const w = el.offsetWidth || 170, h = el.offsetHeight || 220;
+    let left = screenX + 12, top = screenY - h / 2;
+    if (left + w > vpW - margin) left = screenX - w - 12;
+    if (top < margin) top = margin;
+    if (top + h > vpH - margin) top = vpH - h - margin;
+    el.style.left = `${left}px`;
+    el.style.top  = `${top}px`;
+}
+
+function hideViewSelector() {
+    if (_viewSelectorEl) _viewSelectorEl.setAttribute('hidden', '');
+    _viewSelectorPanel = null;
+}
+
+// Wire view-option buttons
+if (_viewSelectorEl) {
+    _viewSelectorEl.addEventListener('click', e => {
+        const btn = e.target.closest('.view-option-btn');
+        if (btn && _viewSelectorPanel) {
+            applyViewToPanel(_viewSelectorPanel, btn.dataset.view);
+            hideViewSelector();
+        }
+        e.stopPropagation();
+    });
+}
+
+// Dismiss on outside click
+document.addEventListener('click', e => {
+    if (_viewSelectorEl && !_viewSelectorEl.hasAttribute('hidden')) {
+        if (!_viewSelectorEl.contains(e.target)) hideViewSelector();
+    }
+}, true);
 
 /* ============================================
    Particle System Animation
@@ -1811,7 +2058,7 @@ function updateCircadianFixtures(hour) {
     // Map hour → warm to cool color shift
     const keys = [0, 6, 12, 18, 24];
     const colors = [0x331122, 0xff9944, 0xffeedd, 0xff8833, 0x331122];
-    const intensities = [0.05, 0.2, 0.4, 0.25, 0.05];
+    const intensities = [0.04, 0.35, 0.70, 0.40, 0.04];
 
     let idx = 0;
     for (let k = 0; k < keys.length - 1; k++) {
@@ -2172,7 +2419,7 @@ function updateFirstPerson(delta) {
     fpControls.moveForward(-dir.z * speed);
 
     // Clamp to terrain
-    camera.position.y = 1.7;
+    camera.position.y = 1.85;
 }
 
 /* ============================================
@@ -2287,6 +2534,9 @@ function animate() {
 
     // Animated interior elements
     animateInteriors(elapsed);
+
+    // Door sensor frame scan lines + node pulses
+    animateDoorSensors(elapsed);
 
     // Particle drift
     animateParticles(delta);
@@ -2417,6 +2667,51 @@ function toggleSensorVisibility(sensorId, visible) {
     }
 }
 
+/* ============================================
+   Interior Environment Map
+   ============================================ */
+
+function generateInteriorEnvMap() {
+    const S = 64;
+    const cv = document.createElement('canvas');
+    cv.width = S * 4; cv.height = S * 2; // equirectangular layout
+    const ctx = cv.getContext('2d');
+
+    // Upper half: dome interior — dark steel zenith fading to panel-gray horizon
+    const sky = ctx.createLinearGradient(0, 0, 0, S);
+    sky.addColorStop(0,   '#1a1d22'); // zenith — dark steel
+    sky.addColorStop(0.6, '#3a3d44'); // mid — panel gray
+    sky.addColorStop(1,   '#555966'); // horizon — lighter
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, S * 4, S);
+
+    // Lower half: floor gray
+    ctx.fillStyle = '#4a4f58';
+    ctx.fillRect(0, S, S * 4, S);
+
+    // 5 warm radial ceiling fixture blobs
+    const fixtures = [
+        [S * 0.5, S * 0.15], [S * 1.5, S * 0.1], [S * 2.5, S * 0.15],
+        [S * 3.5, S * 0.1],  [S * 2.0, S * 0.25]
+    ];
+    for (const [fx, fy] of fixtures) {
+        const g = ctx.createRadialGradient(fx, fy, 0, fx, fy, S * 0.35);
+        g.addColorStop(0, 'rgba(255,240,200,0.22)');
+        g.addColorStop(1, 'rgba(255,240,200,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, S * 4, S);
+    }
+
+    const equiTex = new THREE.CanvasTexture(cv);
+    equiTex.mapping = THREE.EquirectangularReflectionMapping;
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    pmrem.compileEquirectangularShader();
+    const env = pmrem.fromEquirectangular(equiTex).texture;
+    pmrem.dispose();
+    equiTex.dispose();
+    return env;
+}
+
 async function init() {
     setLoadProgress(5, 'Generating terrain…');
 
@@ -2434,6 +2729,11 @@ async function init() {
 
     // Earth
     scene.add(createEarth());
+
+    // Interior environment map — makes metal sheen + window reflections work
+    scene.environment = generateInteriorEnvMap();
+    scene.environmentIntensity = 0.4;
+
     setLoadProgress(25, 'Building habitat modules…');
 
     // Build habitat

@@ -402,13 +402,14 @@ export function buildDomeModule(moduleInfo, moduleName, moduleType) {
     const floorGeo = new THREE.CircleGeometry(radius * 0.95, 16);
     floorGeo.rotateX(-Math.PI / 2);
     const floorMat = new THREE.MeshStandardMaterial({
-        color: 0x2a2a3e,
-        roughness: 0.8,
-        metalness: 0.2
+        color: 0xd8d8d8,
+        roughness: 0.75,
+        metalness: 0.05
     });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.position.y = 0.01;
     floor.receiveShadow = true;
+    floor.userData.isModuleFloor = true;
     group.add(floor);
 
     // --- Module label (CSS2D) ---
@@ -465,6 +466,54 @@ function createFaceGeometry(faceVerts, center) {
    ============================================ */
 
 /**
+ * Add a motion-sensor doorway frame at a corridor entrance.
+ * @param {THREE.Group} group - Corridor group to add to.
+ * @param {THREE.Vector3} worldPos - Position in world space.
+ * @param {number} angle - Corridor Y rotation angle.
+ * @param {number} corridorR - Corridor radius.
+ */
+function addDoorwaySensorFrame(group, worldPos, angle, corridorR) {
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.6, roughness: 0.3 });
+    const nodeMat  = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.7 });
+    const scanMat  = new THREE.MeshStandardMaterial({
+        color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.6,
+        transparent: true, opacity: 0.5, side: THREE.DoubleSide
+    });
+
+    const frameGroup = new THREE.Group();
+    frameGroup.position.set(worldPos.x, 0, worldPos.z);
+    frameGroup.rotation.y = angle;
+
+    // Top bar
+    const topBar = new THREE.Mesh(new THREE.BoxGeometry(corridorR * 2.2, 0.08, 0.06), frameMat);
+    topBar.position.set(0, 2.04, 0);
+    frameGroup.add(topBar);
+
+    // Side verticals
+    for (const side of [-1, 1]) {
+        const vert = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.0, 0.06), frameMat);
+        vert.position.set(side * corridorR * 1.1, 1.0, 0);
+        frameGroup.add(vert);
+    }
+
+    // 4 corner sensor nodes
+    for (const [cx, cy] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) {
+        const node = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), nodeMat.clone());
+        node.position.set(cx * corridorR * 1.1, cy > 0 ? 2.04 : 0.04, 0);
+        node.userData.isDoorCornerNode = true;
+        frameGroup.add(node);
+    }
+
+    // Animated scan line — moves up/down inside frame
+    const scanLine = new THREE.Mesh(new THREE.PlaneGeometry(corridorR * 1.9, 0.04), scanMat.clone());
+    scanLine.position.set(0, 1.0, 0);
+    scanLine.userData.isDoorScanLine = true;
+    frameGroup.add(scanLine);
+
+    group.add(frameGroup);
+}
+
+/**
  * Build a corridor connecting two module positions.
  */
 function buildCorridor(posA, posB) {
@@ -489,7 +538,7 @@ function buildCorridor(posA, posB) {
     );
     const tubeGeo = new THREE.TubeGeometry(tubePath, Math.max(2, Math.floor(len / 5)), corridorRadius, 8, false);
     const tubeMat = new THREE.MeshPhysicalMaterial({
-        color: 0x556677,
+        color: 0x8899aa,
         metalness: 0.6,
         roughness: 0.3,
         transparent: true,
@@ -507,9 +556,9 @@ function buildCorridor(posA, posB) {
     const floorGeo = new THREE.PlaneGeometry(corridorRadius * 1.6, len);
     floorGeo.rotateX(-Math.PI / 2);
     const floorMat = new THREE.MeshStandardMaterial({
-        color: 0x2a2a3e,
-        roughness: 0.8,
-        metalness: 0.2
+        color: 0xc8c8c8,
+        roughness: 0.75,
+        metalness: 0.05
     });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.position.copy(mid);
@@ -573,6 +622,33 @@ function buildCorridor(posA, posB) {
         group.add(led);
     }
 
+    // --- Corridor handrails — one on each side ---
+    const railMat = new THREE.MeshStandardMaterial({ color: 0xc8cdd4, metalness: 0.75, roughness: 0.25 });
+    const stanchionMat = new THREE.MeshStandardMaterial({ color: 0xdde3ea, metalness: 0.5, roughness: 0.4 });
+    for (const side of [-1, 1]) {
+        const railGeo = new THREE.BoxGeometry(0.05, 0.05, len * 0.9);
+        const rail = new THREE.Mesh(railGeo, railMat);
+        rail.position.copy(mid);
+        rail.position.y = 1.1;
+        rail.rotation.y = angle;
+        rail.position.x += Math.cos(angle + Math.PI / 2) * corridorRadius * 0.65 * side;
+        rail.position.z += -Math.sin(angle + Math.PI / 2) * corridorRadius * 0.65 * side;
+        group.add(rail);
+
+        const stanchionCount = Math.max(2, Math.floor(len / 2));
+        for (let s = 0; s <= stanchionCount; s++) {
+            const t = s / stanchionCount;
+            const pos = start.clone().lerp(end, t);
+            const stanchion = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.2, 0.04), stanchionMat);
+            stanchion.position.set(
+                pos.x + Math.cos(angle + Math.PI / 2) * corridorRadius * 0.65 * side,
+                1.0,
+                pos.z - Math.sin(angle + Math.PI / 2) * corridorRadius * 0.65 * side
+            );
+            group.add(stanchion);
+        }
+    }
+
     // --- Airlock rings at both ends ---
     const airlockMat = new THREE.MeshStandardMaterial({
         color: 0xef4444,
@@ -592,6 +668,11 @@ function buildCorridor(posA, posB) {
     }
 
     // --- Corridor lighting provided by emissive arch + LED strips (no PointLight) ---
+
+    // --- Doorway sensor frames at corridor entrances ---
+    const dir2 = dir.clone().normalize();
+    addDoorwaySensorFrame(group, start.clone().add(dir2.clone().multiplyScalar(1.5)), angle, corridorRadius);
+    addDoorwaySensorFrame(group, end.clone().sub(dir2.clone().multiplyScalar(1.5)), angle, corridorRadius);
 
     return group;
 }
