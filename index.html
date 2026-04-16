@@ -34,7 +34,8 @@
 
             <div class="controls-group controls-group--import">
                 <button id="btn-import" class="control-btn" title="Import CSV or JSON data file">
-                    📂 Import Data
+                    <svg class="icon icon--sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    Import Data
                 </button>
                 <input type="file" id="file-import" accept=".csv,.json" class="sr-only" aria-label="Choose CSV or JSON file to import">
                 <button id="btn-import-help" class="control-btn control-btn--icon" title="Show expected file format" aria-label="File format help">
@@ -42,7 +43,9 @@
                 </button>
                 <div id="import-badge" class="import-badge" hidden>
                     <span id="import-filename" class="import-badge-name"></span>
-                    <button id="btn-import-clear" class="import-badge-clear" title="Clear imported data" aria-label="Clear imported data">✕</button>
+                    <button id="btn-import-clear" class="import-badge-clear" title="Clear imported data" aria-label="Clear imported data">
+                        <svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
                 </div>
             </div>
 
@@ -66,12 +69,55 @@
 
             <div class="controls-group">
                 <button id="music-toggle" class="music-toggle-btn" role="switch" aria-checked="false" aria-label="Toggle background music" title="Toggle ambient music">
-                    <span class="music-icon">🔇</span>
+                    <span class="music-icon"><svg class="icon icon--sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg></span>
                     <span class="music-label">Music</span>
                 </button>
             </div>
         </div>
     </header>
+
+    <!-- ===== Habitat 3D Hero Section ===== -->
+    <section id="habitat-hero" class="habitat-hero" aria-labelledby="habitat-hero-title">
+        <div class="habitat-hero__stars" aria-hidden="true"></div>
+        <div class="habitat-hero__content">
+            <span class="habitat-hero__badge">Primary Mission</span>
+            <h2 id="habitat-hero-title" class="habitat-hero__title">3D Lunar Habitat</h2>
+            <p class="habitat-hero__subtitle">Explore an interactive simulation of a modular lunar habitat.<br>Walk through crew quarters, monitor biometric sensors, and test environmental scenarios in real time.</p>
+            <a href="pages/habitat-3d.html" class="habitat-hero__cta">
+                <span class="habitat-hero__cta-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg></span>
+                Enter Habitat 3D
+            </a>
+        </div>
+        <div class="habitat-hero__features">
+            <div class="habitat-hero__card">
+                <span class="habitat-hero__card-icon" aria-hidden="true"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 6v12"/><path d="M2 12h20"/><path d="M6 6v12"/><path d="M18 6v12"/></svg></span>
+                <h3 class="habitat-hero__card-title">Immersive Walkthrough</h3>
+                <p class="habitat-hero__card-desc">First-person exploration of modular habitat with orbital and walkthrough camera modes.</p>
+            </div>
+            <div class="habitat-hero__card">
+                <span class="habitat-hero__card-icon" aria-hidden="true"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/><polyline points="3 12 7 12 9 8 13 16 15 12 19 12"/></svg></span>
+                <h3 class="habitat-hero__card-title">Biometric Sensors</h3>
+                <p class="habitat-hero__card-desc">14 real-time biometric indicators — vitals, sleep, stress, and behavioral patterns.</p>
+            </div>
+            <div class="habitat-hero__card">
+                <span class="habitat-hero__card-icon" aria-hidden="true"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6v5a3 3 0 0 1-6 0V3z"/><path d="M12 8v8"/><path d="M7 19c0-2.21 2.24-4 5-4s5 1.79 5 4"/><line x1="7" y1="19" x2="7" y2="21"/><line x1="17" y1="19" x2="17" y2="21"/><line x1="6" y1="21" x2="18" y2="21"/></svg></span>
+                <h3 class="habitat-hero__card-title">Scenario Simulation</h3>
+                <p class="habitat-hero__card-desc">8 preset scenarios including EVA spacewalks, emergencies, and sleep deprivation.</p>
+            </div>
+            <div class="habitat-hero__card">
+                <span class="habitat-hero__card-icon" aria-hidden="true"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+                <h3 class="habitat-hero__card-title">Crew Monitoring</h3>
+                <p class="habitat-hero__card-desc">Track crew wellbeing, circadian rhythms, and environmental factors in a 24-hour cycle.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Supporting Systems ===== -->
+    <div class="supporting-divider" aria-hidden="true">
+        <span class="supporting-divider__line"></span>
+        <span class="supporting-divider__label">Supporting Systems</span>
+        <span class="supporting-divider__line"></span>
+    </div>
 
     <main id="main-content" class="main-layout">
         <section id="wristband-panel" class="panel">
@@ -110,7 +156,9 @@
         <div class="import-help-content">
             <div class="import-help-header">
                 <strong>Expected File Format</strong>
-                <button id="btn-close-help" class="import-badge-clear" aria-label="Close help">✕</button>
+                <button id="btn-close-help" class="import-badge-clear" aria-label="Close help">
+                    <svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
             </div>
             <div class="import-help-body">
                 <p><strong>CSV</strong> — first row must be column headers, comma-separated.</p>

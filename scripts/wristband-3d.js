@@ -8,18 +8,19 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { SCENARIOS, getCurrentSample, computeWellbeingIndex, computeStatus } from './data.js';
+import { icon } from './icons.js';
 
 /* ============================================
    Constants & Sensor Metadata
    ============================================ */
 
 const SENSOR_INFO = [
-    { id: 'hr',       name: 'Heart Rate',              icon: '♥',  unit: 'bpm',       range: '55–140', key: 'heartRateBpm',    why: 'Tracks cardiovascular response to stress, exercise, and rest cycles' },
-    { id: 'hrv',      name: 'Heart Rate Variability',   icon: '📊', unit: 'ms',        range: '20–120', key: 'hrvMs',           why: 'Indicates autonomic nervous system balance; low HRV correlates with stress' },
-    { id: 'eda',      name: 'Electrodermal Activity',   icon: '⚡', unit: 'µS',        range: '0.5–8.0', key: 'edaMicrosiemens', why: 'Measures sympathetic nervous system arousal; spikes indicate stress response' },
-    { id: 'temp',     name: 'Skin Temperature',         icon: '🌡', unit: '°C',        range: '32.0–36.5', key: 'skinTempC',    why: 'Peripheral temperature shifts reflect circadian rhythm and stress' },
-    { id: 'activity', name: 'Activity Level',            icon: '🏃', unit: 'score 0–100', range: '0–100', key: 'activityScore',  why: 'Quantifies movement intensity; essential for exercise tracking and sedentary alerts' },
-    { id: 'sleep',    name: 'Sleep Quality',             icon: '😴', unit: 'hours',     range: '0–480 min', key: 'sleepMinutes', why: 'Derived from HR, HRV, and movement; critical for cognitive performance' }
+    { id: 'hr',       name: 'Heart Rate',              icon: icon('heart'),       unit: 'bpm',       range: '55–140', key: 'heartRateBpm',    why: 'Tracks cardiovascular response to stress, exercise, and rest cycles' },
+    { id: 'hrv',      name: 'Heart Rate Variability',   icon: icon('chartBar'),    unit: 'ms',        range: '20–120', key: 'hrvMs',           why: 'Indicates autonomic nervous system balance; low HRV correlates with stress' },
+    { id: 'eda',      name: 'Electrodermal Activity',   icon: icon('zap'),         unit: 'µS',        range: '0.5–8.0', key: 'edaMicrosiemens', why: 'Measures sympathetic nervous system arousal; spikes indicate stress response' },
+    { id: 'temp',     name: 'Skin Temperature',         icon: icon('thermometer'), unit: '°C',        range: '32.0–36.5', key: 'skinTempC',    why: 'Peripheral temperature shifts reflect circadian rhythm and stress' },
+    { id: 'activity', name: 'Activity Level',            icon: icon('activity'),    unit: 'score 0–100', range: '0–100', key: 'activityScore',  why: 'Quantifies movement intensity; essential for exercise tracking and sedentary alerts' },
+    { id: 'sleep',    name: 'Sleep Quality',             icon: icon('moonSleep'),   unit: 'hours',     range: '0–480 min', key: 'sleepMinutes', why: 'Derived from HR, HRV, and movement; critical for cognitive performance' }
 ];
 
 const STATUS_COLORS = {
@@ -182,12 +183,12 @@ function updateScreenTexture(time) {
     // Vitals
     const s = currentSample;
     const readings = [
-        { icon: '♥', label: 'HR',    value: `${Math.round(s.heartRateBpm)}`, unit: 'bpm' },
-        { icon: '〰', label: 'HRV',   value: `${Math.round(s.hrvMs)}`,       unit: 'ms' },
+        { icon: '❤', label: 'HR',    value: `${Math.round(s.heartRateBpm)}`, unit: 'bpm' },
+        { icon: '∿',  label: 'HRV',   value: `${Math.round(s.hrvMs)}`,       unit: 'ms' },
         { icon: '⚡', label: 'EDA',   value: `${s.edaMicrosiemens.toFixed(1)}`, unit: 'µS' },
-        { icon: '🌡', label: 'TEMP',  value: `${s.skinTempC.toFixed(1)}`,    unit: '°C' },
-        { icon: '🏃', label: 'ACT',   value: `${Math.round(s.activityScore)}`, unit: '/100' },
-        { icon: '😴', label: 'SLEEP', value: `${(s.sleepMinutes / 60).toFixed(1)}`, unit: 'hrs' }
+        { icon: '°',  label: 'TEMP',  value: `${s.skinTempC.toFixed(1)}`,    unit: '°C' },
+        { icon: '▲',  label: 'ACT',   value: `${Math.round(s.activityScore)}`, unit: '/100' },
+        { icon: '☾',  label: 'SLEEP', value: `${(s.sleepMinutes / 60).toFixed(1)}`, unit: 'hrs' }
     ];
 
     let y = 120;

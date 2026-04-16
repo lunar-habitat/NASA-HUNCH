@@ -8,6 +8,7 @@ import { AppState, formatNumber, createElement } from './utils.js';
 import { getCurrentSample, computeWellbeingIndex, computeStatus, generateAndStore, getLatestSample, getRollingWindow } from './data.js';
 import { createChart } from './charts.js';
 import { importFile } from './import.js';
+import { icon } from './icons.js';
 
 /* ============================================
    Sensor Metadata
@@ -16,37 +17,37 @@ import { importFile } from './import.js';
 /** Sensor definitions — icon, units, ranges, descriptions */
 const SENSOR_INFO = [
     {
-        id: 'hr', name: 'Heart Rate', icon: '♥',
+        id: 'hr', name: 'Heart Rate', icon: icon('heart'),
         unit: 'bpm', range: '55–140', key: 'heartRateBpm',
         color: '#ef4444',
         why: 'Tracks cardiovascular response to stress, exercise, and rest cycles'
     },
     {
-        id: 'hrv', name: 'Heart Rate Variability', icon: '📊',
+        id: 'hrv', name: 'Heart Rate Variability', icon: icon('chartBar'),
         unit: 'ms', range: '20–120', key: 'hrvMs',
         color: '#f472b6',
         why: 'Indicates autonomic nervous system balance; low HRV correlates with stress'
     },
     {
-        id: 'eda', name: 'Electrodermal Activity', icon: '⚡',
+        id: 'eda', name: 'Electrodermal Activity', icon: icon('zap'),
         unit: 'µS', range: '0.5–8.0', key: 'edaMicrosiemens',
         color: '#facc15',
         why: 'Measures sympathetic nervous system arousal; spikes indicate stress response'
     },
     {
-        id: 'temp', name: 'Skin Temperature', icon: '🌡',
+        id: 'temp', name: 'Skin Temperature', icon: icon('thermometer'),
         unit: '°C', range: '32.0–36.5', key: 'skinTempC',
         color: '#fb923c',
         why: 'Peripheral temperature shifts reflect circadian rhythm and stress'
     },
     {
-        id: 'activity', name: 'Activity Level', icon: '🏃',
+        id: 'activity', name: 'Activity Level', icon: icon('activity'),
         unit: 'score 0–100', range: '0–100', key: 'activityScore',
         color: '#34d399',
         why: 'Quantifies movement intensity; essential for exercise tracking and sedentary alerts'
     },
     {
-        id: 'sleep', name: 'Sleep Quality', icon: '😴',
+        id: 'sleep', name: 'Sleep Quality', icon: icon('moonSleep'),
         unit: 'hours + score', range: '0–480 min', key: 'sleepMinutes',
         color: '#818cf8',
         why: 'Derived from HR, HRV, and movement; critical for cognitive performance'
@@ -56,67 +57,67 @@ const SENSOR_INFO = [
 /** Habitat-integrated sensor definitions — not on wristband, monitored via habitat systems */
 const HABITAT_SENSOR_INFO = [
     {
-        id: 'voice', name: 'Voice Stress', icon: '🎙',
+        id: 'voice', name: 'Voice Stress', icon: icon('mic'),
         unit: 'score 0–100', range: '0–100', key: 'voiceStressIndex',
         why: 'Voice recognition analysis detects stress markers, tremor, and tonal shifts',
         systemId: 'voiceRecognition'
     },
     {
-        id: 'pupil', name: 'Pupil Dilation', icon: '👁',
+        id: 'pupil', name: 'Pupil Dilation', icon: icon('eye'),
         unit: 'mm', range: '2.0–8.0', key: 'pupilDilationMm',
         why: 'Pupillometer scans measure dilation correlated with cognitive load and stress',
         systemId: 'facialScans'
     },
     {
-        id: 'social', name: 'Social Interaction', icon: '👥',
+        id: 'social', name: 'Social Interaction', icon: icon('users'),
         unit: 'score 0–100', range: '0–100', key: 'socialScore',
         why: 'Behavioral analysis of door usage, common-area presence, and crew interaction patterns',
         systemId: 'behavioralPattern'
     },
     {
-        id: 'routine', name: 'Routine Deviation', icon: '📋',
+        id: 'routine', name: 'Routine Deviation', icon: icon('clipboard'),
         unit: 'score 0–100', range: '0–100', key: 'routineDeviation',
         why: 'Tracks changes in daily routines, workstation interaction, and task completion timing',
         systemId: 'behavioralPattern'
     },
     {
-        id: 'cognitive', name: 'Cognitive Load', icon: '🧠',
+        id: 'cognitive', name: 'Cognitive Load', icon: icon('brain'),
         unit: 'score 0–100', range: '0–100', key: 'cognitiveLoad',
         why: 'Derived from task completion timing, workstation interaction, and pupillometry data',
         systemId: 'behavioralPattern'
     },
     {
-        id: 'sleepQuality', name: 'Sleep Stage Quality', icon: '💤',
+        id: 'sleepQuality', name: 'Sleep Stage Quality', icon: icon('sleepQuality'),
         unit: 'score 0–100', range: '0–100', key: 'sleepQuality',
         why: 'Mattress pressure sensors monitor deep/REM/light sleep stage composition',
         systemId: 'mattressSensors'
     },
     {
-        id: 'circadian', name: 'Circadian Alignment', icon: '🌗',
+        id: 'circadian', name: 'Circadian Alignment', icon: icon('circadian'),
         unit: 'score 0–100', range: '0–100', key: 'circadianAlignment',
         why: 'Measures alignment with Earth-like day-night rhythm managed by LED circadian panels',
         systemId: 'circadianLight'
     },
     {
-        id: 'lightSpectrum', name: 'Light Spectrum', icon: '🌈',
+        id: 'lightSpectrum', name: 'Light Spectrum', icon: icon('spectrum'),
         unit: 'score 0–100', range: '0–100', key: 'lightSpectrumScore',
         why: 'How closely the LED panel replicates the natural light spectrum of Earth',
         systemId: 'circadianLight'
     },
     {
-        id: 'greenery', name: 'Greenery Exposure', icon: '🌿',
+        id: 'greenery', name: 'Greenery Exposure', icon: icon('leaf'),
         unit: 'min/day', range: '0–120', key: 'greeneryExposureMin',
         why: 'Daily minutes spent near greenery backgrounds simulating Earth-like environments',
         systemId: 'greeneryNature'
     },
     {
-        id: 'soundscape', name: 'Nature Soundscape', icon: '🔊',
+        id: 'soundscape', name: 'Nature Soundscape', icon: icon('speaker'),
         unit: 'score 0–100', range: '0–100', key: 'natureSoundscapeScore',
         why: 'Engagement level with ambient Earth soundscapes (rain, birds, wind, ocean)',
         systemId: 'greeneryNature'
     },
     {
-        id: 'windowSim', name: 'Window Simulation', icon: '🪟',
+        id: 'windowSim', name: 'Window Simulation', icon: icon('windowSim'),
         unit: 'score 0–100', range: '0–100', key: 'windowSimStatus',
         why: 'Quality of Earth-view window simulation with dynamic scenery and lighting',
         systemId: 'greeneryNature'
@@ -132,7 +133,7 @@ const SYSTEMS = [
     {
         id: 'voiceRecognition',
         name: 'Voice Recognition / Analysis',
-        icon: '🎙',
+        icon: icon('mic'),
         color: '#fb923c',
         description: 'Vocal biomarker analysis detecting stress, fatigue, and emotional state through speech patterns',
         metrics: ['voiceStressIndex'],
@@ -141,7 +142,7 @@ const SYSTEMS = [
     {
         id: 'facialScans',
         name: 'Facial Scans (Pupillometer)',
-        icon: '👁',
+        icon: icon('eye'),
         color: '#f472b6',
         description: 'Non-invasive pupillometer measuring pupil dilation to assess cognitive load and acute stress',
         metrics: ['pupilDilationMm'],
@@ -150,7 +151,7 @@ const SYSTEMS = [
     {
         id: 'behavioralPattern',
         name: 'Behavioral Pattern Analysis',
-        icon: '📊',
+        icon: icon('chartBar'),
         color: '#2dd4bf',
         description: 'Camera-free monitoring of movement patterns, social withdrawal, daily routine changes, door usage, workstation interaction, and task completion timing',
         metrics: ['socialScore', 'routineDeviation', 'cognitiveLoad', 'activityScore'],
@@ -159,7 +160,7 @@ const SYSTEMS = [
     {
         id: 'hrvMonitoring',
         name: 'HRV Monitoring (Wristband)',
-        icon: '💓',
+        icon: icon('heartPulse'),
         color: '#ef4444',
         description: 'Wristband-integrated heart rate variability monitoring for stress levels, emotional regulation, fatigue, and anxiety detection',
         metrics: ['heartRateBpm', 'hrvMs', 'edaMicrosiemens', 'skinTempC'],
@@ -168,7 +169,7 @@ const SYSTEMS = [
     {
         id: 'mattressSensors',
         name: 'Mattress Pressure Sensors',
-        icon: '🛏️',
+        icon: icon('bed'),
         color: '#60a5fa',
         description: 'Sleep monitoring via pressure sensors: sleep duration, sleep stages, restlessness, and circadian misalignment detection',
         metrics: ['sleepMinutes', 'sleepQuality', 'restlessnessScore'],
@@ -177,7 +178,7 @@ const SYSTEMS = [
     {
         id: 'circadianLight',
         name: 'Circadian Light Panel',
-        icon: '☀️',
+        icon: icon('sun'),
         color: '#facc15',
         description: 'LED technology replicating Earth light spectrum and day-night rhythm to maintain healthy circadian cycles',
         metrics: ['circadianAlignment', 'lightSpectrumScore'],
@@ -186,7 +187,7 @@ const SYSTEMS = [
     {
         id: 'greeneryNature',
         name: 'Greenery & Nature Simulation',
-        icon: '🌿',
+        icon: icon('leaf'),
         color: '#22c55e',
         description: 'Earth-like visual and auditory environments: greenery window backgrounds, dynamic scenery, and ambient nature soundscapes',
         metrics: ['greeneryExposureMin', 'natureSoundscapeScore', 'windowSimStatus'],
@@ -461,12 +462,12 @@ function buildWristbandSVG(sample) {
       <!-- ===== Screen readout ===== -->
       <g class="device-screen-text" font-family="'JetBrains Mono','Fira Code',monospace" fill="#c8d6e5">
         <text x="143" y="68" font-size="7.5" fill="#7a8ba0" letter-spacing="1.5" opacity="0.7">${AppState.privacyMode ? 'PRIVATE' : 'SIMULATED'}</text>
-        <text x="143" y="84" font-size="10"><tspan fill="#ef4444">♥</tspan> ${AppState.privacyMode ? '---' : Math.round(sample.heartRateBpm)} <tspan fill="#6b7f96" font-size="7">bpm</tspan></text>
+        <text x="143" y="84" font-size="10"><tspan fill="#ef4444">❤</tspan> ${AppState.privacyMode ? '---' : Math.round(sample.heartRateBpm)} <tspan fill="#6b7f96" font-size="7">bpm</tspan></text>
         <text x="216" y="84" font-size="9"><tspan fill="#f472b6">HRV</tspan> ${AppState.privacyMode ? '---' : Math.round(sample.hrvMs)}<tspan fill="#6b7f96" font-size="7">ms</tspan></text>
         <text x="143" y="100" font-size="10"><tspan fill="#facc15">⚡</tspan>${AppState.privacyMode ? '---' : formatNumber(sample.edaMicrosiemens, 1)} <tspan fill="#6b7f96" font-size="7">µS</tspan></text>
-        <text x="216" y="100" font-size="9">🌡${AppState.privacyMode ? '---' : formatNumber(sample.skinTempC, 1)}<tspan fill="#6b7f96" font-size="7">°C</tspan></text>
-        <text x="143" y="116" font-size="10"><tspan fill="#34d399">🏃</tspan> ${AppState.privacyMode ? '---' : actLabel}</text>
-        <text x="216" y="116" font-size="9"><tspan fill="#818cf8">😴</tspan> ${AppState.privacyMode ? '---' : sleepH}<tspan fill="#6b7f96" font-size="7">h</tspan></text>
+        <text x="216" y="100" font-size="9"><tspan fill="#fb923c">°</tspan>${AppState.privacyMode ? '---' : formatNumber(sample.skinTempC, 1)}<tspan fill="#6b7f96" font-size="7">°C</tspan></text>
+        <text x="143" y="116" font-size="10"><tspan fill="#34d399">ACT</tspan> ${AppState.privacyMode ? '---' : actLabel}</text>
+        <text x="216" y="116" font-size="9"><tspan fill="#818cf8">SLP</tspan> ${AppState.privacyMode ? '---' : sleepH}<tspan fill="#6b7f96" font-size="7">h</tspan></text>
         <text x="143" y="140" font-size="6" fill="#5a6a7e" letter-spacing="1" opacity="0.55">LUNAR HABITAT MONITOR</text>
       </g>
 
@@ -502,7 +503,7 @@ function buildSensorCards(container, sample) {
                 <div class="sensor-reading">Current: ${formatReading(sensor, sample)}</div>
                 <div class="sensor-why">${sensor.why}</div>
             </div>
-            <div class="sensor-privacy">🔒 Crew-controlled data sharing</div>`;
+            <div class="sensor-privacy">${icon('lock', 'sm')} Crew-controlled data sharing</div>`;
 
         container.appendChild(card);
     });
@@ -593,23 +594,23 @@ function renderKPIs(sample, series, container = null, systemId = null) {
 
     // All metrics definitions (wristband + habitat)
     const allMetrics = [
-        { icon: '♥',  label: 'Heart Rate', value: Math.round(sample.heartRateBpm), unit: 'bpm', sensorId: 'hr', metricKey: 'heartRateBpm' },
-        { icon: '📊', label: 'HRV',        value: Math.round(sample.hrvMs),        unit: 'ms', sensorId: 'hrv', metricKey: 'hrvMs' },
-        { icon: '⚡', label: 'EDA',        value: sample.edaMicrosiemens.toFixed(1), unit: 'µS', sensorId: 'eda', metricKey: 'edaMicrosiemens' },
-        { icon: '🌡', label: 'Skin Temp',  value: sample.skinTempC.toFixed(1),      unit: '°C', sensorId: 'temp', metricKey: 'skinTempC' },
-        { icon: '🏃', label: 'Activity',   value: Math.round(sample.activityScore), unit: '/100', sensorId: 'activity', metricKey: 'activityScore' },
-        { icon: '😴', label: 'Sleep',      value: (sample.sleepMinutes / 60).toFixed(1), unit: 'hrs', sensorId: 'sleep', metricKey: 'sleepMinutes' },
-        { icon: '🎙', label: 'Voice Stress',  value: Math.round(sample.voiceStressIndex ?? 15),  unit: '/100', sensorId: 'voice', metricKey: 'voiceStressIndex' },
-        { icon: '👁', label: 'Pupil Dilation', value: (sample.pupilDilationMm ?? 3.2).toFixed(1), unit: 'mm',   sensorId: 'pupil', metricKey: 'pupilDilationMm' },
-        { icon: '👥', label: 'Social',         value: Math.round(sample.socialScore ?? 70),        unit: '/100', sensorId: 'social', metricKey: 'socialScore' },
-        { icon: '📋', label: 'Routine Dev.',   value: Math.round(sample.routineDeviation ?? 12),   unit: '/100', sensorId: 'routine', metricKey: 'routineDeviation' },
-        { icon: '🧠', label: 'Cognitive Load', value: Math.round(sample.cognitiveLoad ?? 30),      unit: '/100', sensorId: 'cognitive', metricKey: 'cognitiveLoad' },
-        { icon: '💤', label: 'Sleep Quality',  value: Math.round(sample.sleepQuality ?? 78),       unit: '/100', sensorId: 'sleepQuality', metricKey: 'sleepQuality' },
-        { icon: '🌗', label: 'Circadian',      value: Math.round(sample.circadianAlignment ?? 85), unit: '/100', sensorId: 'circadian', metricKey: 'circadianAlignment' },
-        { icon: '🌈', label: 'Light Spectrum', value: Math.round(sample.lightSpectrumScore ?? 88), unit: '/100', sensorId: 'lightSpectrum', metricKey: 'lightSpectrumScore' },
-        { icon: '🌿', label: 'Greenery',       value: Math.round(sample.greeneryExposureMin ?? 65), unit: 'min', sensorId: 'greenery', metricKey: 'greeneryExposureMin' },
-        { icon: '🔊', label: 'Soundscape',     value: Math.round(sample.natureSoundscapeScore ?? 75), unit: '/100', sensorId: 'soundscape', metricKey: 'natureSoundscapeScore' },
-        { icon: '🪟', label: 'Window Sim',     value: Math.round(sample.windowSimStatus ?? 82),    unit: '/100', sensorId: 'windowSim', metricKey: 'windowSimStatus' }
+        { icon: icon('heart'),       label: 'Heart Rate', value: Math.round(sample.heartRateBpm), unit: 'bpm', sensorId: 'hr', metricKey: 'heartRateBpm' },
+        { icon: icon('chartBar'),    label: 'HRV',        value: Math.round(sample.hrvMs),        unit: 'ms', sensorId: 'hrv', metricKey: 'hrvMs' },
+        { icon: icon('zap'),         label: 'EDA',        value: sample.edaMicrosiemens.toFixed(1), unit: 'µS', sensorId: 'eda', metricKey: 'edaMicrosiemens' },
+        { icon: icon('thermometer'), label: 'Skin Temp',  value: sample.skinTempC.toFixed(1),      unit: '°C', sensorId: 'temp', metricKey: 'skinTempC' },
+        { icon: icon('activity'),    label: 'Activity',   value: Math.round(sample.activityScore), unit: '/100', sensorId: 'activity', metricKey: 'activityScore' },
+        { icon: icon('moonSleep'),   label: 'Sleep',      value: (sample.sleepMinutes / 60).toFixed(1), unit: 'hrs', sensorId: 'sleep', metricKey: 'sleepMinutes' },
+        { icon: icon('mic'),         label: 'Voice Stress',  value: Math.round(sample.voiceStressIndex ?? 15),  unit: '/100', sensorId: 'voice', metricKey: 'voiceStressIndex' },
+        { icon: icon('eye'),         label: 'Pupil Dilation', value: (sample.pupilDilationMm ?? 3.2).toFixed(1), unit: 'mm',   sensorId: 'pupil', metricKey: 'pupilDilationMm' },
+        { icon: icon('users'),       label: 'Social',         value: Math.round(sample.socialScore ?? 70),        unit: '/100', sensorId: 'social', metricKey: 'socialScore' },
+        { icon: icon('clipboard'),   label: 'Routine Dev.',   value: Math.round(sample.routineDeviation ?? 12),   unit: '/100', sensorId: 'routine', metricKey: 'routineDeviation' },
+        { icon: icon('brain'),       label: 'Cognitive Load', value: Math.round(sample.cognitiveLoad ?? 30),      unit: '/100', sensorId: 'cognitive', metricKey: 'cognitiveLoad' },
+        { icon: icon('sleepQuality'),label: 'Sleep Quality',  value: Math.round(sample.sleepQuality ?? 78),       unit: '/100', sensorId: 'sleepQuality', metricKey: 'sleepQuality' },
+        { icon: icon('circadian'),   label: 'Circadian',      value: Math.round(sample.circadianAlignment ?? 85), unit: '/100', sensorId: 'circadian', metricKey: 'circadianAlignment' },
+        { icon: icon('spectrum'),    label: 'Light Spectrum', value: Math.round(sample.lightSpectrumScore ?? 88), unit: '/100', sensorId: 'lightSpectrum', metricKey: 'lightSpectrumScore' },
+        { icon: icon('leaf'),        label: 'Greenery',       value: Math.round(sample.greeneryExposureMin ?? 65), unit: 'min', sensorId: 'greenery', metricKey: 'greeneryExposureMin' },
+        { icon: icon('speaker'),     label: 'Soundscape',     value: Math.round(sample.natureSoundscapeScore ?? 75), unit: '/100', sensorId: 'soundscape', metricKey: 'natureSoundscapeScore' },
+        { icon: icon('windowSim'),   label: 'Window Sim',     value: Math.round(sample.windowSimStatus ?? 82),    unit: '/100', sensorId: 'windowSim', metricKey: 'windowSimStatus' }
     ];
 
     // Filter by system if specified
@@ -661,54 +662,54 @@ function renderInsights(sample, series) {
     const allInsights = [];
 
     if (sample.hrvMs < 30) {
-        allInsights.push({ icon: '⚠️', text: 'HRV below baseline — consider decompression protocol', level: 'warning' });
+        allInsights.push({ icon: icon('alertWarning'), text: 'HRV below baseline — consider decompression protocol', level: 'warning' });
     }
     if (sample.edaMicrosiemens > 4.0) {
-        allInsights.push({ icon: '⚡', text: 'Elevated EDA — sympathetic arousal detected', level: 'warning' });
+        allInsights.push({ icon: icon('zap'), text: 'Elevated EDA — sympathetic arousal detected', level: 'warning' });
     }
     if (sample.heartRateBpm > 100 && sample.activityScore < 30) {
-        allInsights.push({ icon: '🫀', text: 'Elevated resting heart rate — monitor for stress response', level: 'warning' });
+        allInsights.push({ icon: icon('heartPulse'), text: 'Elevated resting heart rate — monitor for stress response', level: 'warning' });
     }
     if (sample.sleepMinutes < 300) {
-        allInsights.push({ icon: '😴', text: 'Sleep deficit detected — suggest circadian lighting adjustment', level: 'danger' });
+        allInsights.push({ icon: icon('moonSleep'), text: 'Sleep deficit detected — suggest circadian lighting adjustment', level: 'danger' });
     }
     if (sample.restlessnessScore > 60) {
-        allInsights.push({ icon: '🛏️', text: 'High restlessness — review sleep environment factors', level: 'warning' });
+        allInsights.push({ icon: icon('bed'), text: 'High restlessness — review sleep environment factors', level: 'warning' });
     }
     if (sample.skinTempC < 32.5) {
-        allInsights.push({ icon: '🌡', text: 'Peripheral temperature low — check habitat thermal regulation', level: 'info' });
+        allInsights.push({ icon: icon('thermometer'), text: 'Peripheral temperature low — check habitat thermal regulation', level: 'info' });
     }
     if (sample.activityScore > 80) {
-        allInsights.push({ icon: '🏃', text: 'High activity level — ensure adequate hydration protocol', level: 'info' });
+        allInsights.push({ icon: icon('activity'), text: 'High activity level — ensure adequate hydration protocol', level: 'info' });
     }
 
     // --- Habitat-integrated mental health insight rules ---
 
     // Combined danger: social withdrawal + stress
     if ((sample.socialScore ?? 70) < 25 && (sample.voiceStressIndex ?? 15) > 50) {
-        allInsights.push({ icon: '🚨', text: 'Social withdrawal with elevated stress — priority mental health assessment', level: 'danger' });
+        allInsights.push({ icon: icon('alertDanger'), text: 'Social withdrawal with elevated stress — priority mental health assessment', level: 'danger' });
     }
 
     if ((sample.voiceStressIndex ?? 15) > 60) {
-        allInsights.push({ icon: '🎙', text: 'Elevated vocal stress markers — consider private counseling session', level: 'warning' });
+        allInsights.push({ icon: icon('mic'), text: 'Elevated vocal stress markers — consider private counseling session', level: 'warning' });
     }
     if ((sample.pupilDilationMm ?? 3.2) > 6.0) {
-        allInsights.push({ icon: '👁', text: 'Sustained pupil dilation — high cognitive demand or acute stress', level: 'warning' });
+        allInsights.push({ icon: icon('eye'), text: 'Sustained pupil dilation — high cognitive demand or acute stress', level: 'warning' });
     }
     if ((sample.socialScore ?? 70) < 25) {
-        allInsights.push({ icon: '👥', text: 'Social withdrawal detected — suggest crew interaction activity', level: 'warning' });
+        allInsights.push({ icon: icon('users'), text: 'Social withdrawal detected — suggest crew interaction activity', level: 'warning' });
     }
     if ((sample.routineDeviation ?? 12) > 60) {
-        allInsights.push({ icon: '📋', text: 'Significant routine deviation — monitor for behavioral pattern changes', level: 'warning' });
+        allInsights.push({ icon: icon('clipboard'), text: 'Significant routine deviation — monitor for behavioral pattern changes', level: 'warning' });
     }
     if ((sample.cognitiveLoad ?? 30) > 75) {
-        allInsights.push({ icon: '🧠', text: 'High cognitive load — recommend task redistribution or break', level: 'warning' });
+        allInsights.push({ icon: icon('brain'), text: 'High cognitive load — recommend task redistribution or break', level: 'warning' });
     }
     if ((sample.sleepQuality ?? 78) < 30) {
-        allInsights.push({ icon: '💤', text: 'Poor sleep stage composition — review mattress and environment factors', level: 'danger' });
+        allInsights.push({ icon: icon('sleepQuality'), text: 'Poor sleep stage composition — review mattress and environment factors', level: 'danger' });
     }
     if ((sample.circadianAlignment ?? 85) < 40) {
-        allInsights.push({ icon: '🌗', text: 'Circadian misalignment — adjust LED light panel schedule', level: 'warning' });
+        allInsights.push({ icon: icon('circadian'), text: 'Circadian misalignment — adjust LED light panel schedule', level: 'warning' });
     }
 
     // Environmental cue: nature simulation recommendation
@@ -720,28 +721,28 @@ function renderInsights(sample, series) {
         (sample.pupilDilationMm ?? 3.2) > 5.5
     ].filter(Boolean).length;
     if (stressIndicators >= 3) {
-        allInsights.push({ icon: '🌿', text: 'Multiple stress indicators elevated — consider activating nature simulation panels and ambient Earth soundscapes', level: 'info' });
+        allInsights.push({ icon: icon('leaf'), text: 'Multiple stress indicators elevated — consider activating nature simulation panels and ambient Earth soundscapes', level: 'info' });
     }
 
     // Greenery & Nature insights
     if ((sample.greeneryExposureMin ?? 65) < 20) {
-        allInsights.push({ icon: '🌿', text: 'Low greenery exposure — schedule time near botanical window panels', level: 'warning' });
+        allInsights.push({ icon: icon('leaf'), text: 'Low greenery exposure — schedule time near botanical window panels', level: 'warning' });
     }
     if ((sample.natureSoundscapeScore ?? 75) < 30) {
-        allInsights.push({ icon: '🔊', text: 'Nature soundscape engagement low — enable ambient Earth sounds', level: 'info' });
+        allInsights.push({ icon: icon('speaker'), text: 'Nature soundscape engagement low — enable ambient Earth sounds', level: 'info' });
     }
     if ((sample.windowSimStatus ?? 82) < 35) {
-        allInsights.push({ icon: '🪟', text: 'Window simulation quality degraded — check display calibration', level: 'warning' });
+        allInsights.push({ icon: icon('windowSim'), text: 'Window simulation quality degraded — check display calibration', level: 'warning' });
     }
 
     // Light Spectrum insight
     if ((sample.lightSpectrumScore ?? 88) < 40) {
-        allInsights.push({ icon: '🌈', text: 'Light spectrum deviation from Earth baseline — recalibrate LED panels', level: 'warning' });
+        allInsights.push({ icon: icon('spectrum'), text: 'Light spectrum deviation from Earth baseline — recalibrate LED panels', level: 'warning' });
     }
 
     // If no warnings/dangers, add success message
     if (allInsights.filter(i => i.level === 'warning' || i.level === 'danger').length === 0) {
-        allInsights.push({ icon: '✅', text: 'All biometrics within expected range — crew status nominal', level: 'success' });
+        allInsights.push({ icon: icon('checkCircle'), text: 'All biometrics within expected range — crew status nominal', level: 'success' });
     }
 
     // Prioritize: dangers first, then warnings, then info, then success
@@ -907,7 +908,7 @@ function initControls() {
             musicPlaying = !musicPlaying;
             musicToggle.setAttribute('aria-checked', String(musicPlaying));
             musicToggle.classList.toggle('music-toggle--active', musicPlaying);
-            musicToggle.querySelector('.music-icon').textContent = musicPlaying ? '🔊' : '🔇';
+            musicToggle.querySelector('.music-icon').innerHTML = musicPlaying ? icon('volumeOn', 'sm') : icon('volumeOff', 'sm');
 
             if (musicPlaying) {
                 bgMusic.play().catch(err => {
@@ -915,7 +916,7 @@ function initControls() {
                     musicPlaying = false;
                     musicToggle.setAttribute('aria-checked', 'false');
                     musicToggle.classList.remove('music-toggle--active');
-                    musicToggle.querySelector('.music-icon').textContent = '🔇';
+                    musicToggle.querySelector('.music-icon').innerHTML = icon('volumeOff', 'sm');
                 });
             } else {
                 bgMusic.pause();
@@ -1121,21 +1122,15 @@ export function renderWristband() {
 
             const link = createElement('a', 'view-3d-link control-btn');
             link.href = 'pages/wristband-3d.html';
-            link.textContent = '🧊 Sci-Fi View';
+            link.innerHTML = icon('cube3d', 'sm') + ' Sci-Fi View';
             link.title = 'Open interactive 3D wristband explorer';
             linksWrap.appendChild(link);
 
             const prodLink = createElement('a', 'view-3d-link control-btn');
             prodLink.href = 'pages/wristband-product.html';
-            prodLink.textContent = '🎨 Product View';
+            prodLink.innerHTML = icon('palette', 'sm') + ' Product View';
             prodLink.title = 'Open photorealistic product render';
             linksWrap.appendChild(prodLink);
-
-            const habitatLink = createElement('a', 'view-3d-link control-btn');
-            habitatLink.href = 'pages/habitat-3d.html';
-            habitatLink.textContent = '🏠 Habitat 3D';
-            habitatLink.title = 'Open 3D lunar habitat simulation';
-            linksWrap.appendChild(habitatLink);
 
             display.appendChild(linksWrap);
         }
@@ -1586,13 +1581,13 @@ export function renderDashboard() {
         const hour = latestTs.getHours();
         let lightPhase, lightIcon, lightColor;
         if (hour >= 6 && hour < 10) {
-            lightPhase = 'Dawn'; lightIcon = '🌅'; lightColor = '#fb923c';
+            lightPhase = 'Dawn'; lightIcon = icon('sunrise', 'sm'); lightColor = '#fb923c';
         } else if (hour >= 10 && hour < 18) {
-            lightPhase = 'Day'; lightIcon = '☀️'; lightColor = '#facc15';
+            lightPhase = 'Day'; lightIcon = icon('sun', 'sm'); lightColor = '#facc15';
         } else if (hour >= 18 && hour < 21) {
-            lightPhase = 'Dusk'; lightIcon = '🌇'; lightColor = '#f472b6';
+            lightPhase = 'Dusk'; lightIcon = icon('sunset', 'sm'); lightColor = '#f472b6';
         } else {
-            lightPhase = 'Night'; lightIcon = '🌙'; lightColor = '#818cf8';
+            lightPhase = 'Night'; lightIcon = icon('moon', 'sm'); lightColor = '#818cf8';
         }
         const circadianVal = Math.round(latestSample.circadianAlignment ?? 85);
         const circadianDisplay = AppState.privacyMode ? privacyMask(circadianVal, 'circadian') : circadianVal;

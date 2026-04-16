@@ -335,9 +335,9 @@ function updateScreenTexture(time) {
 
     // Complications row — 3 circles
     const complications = [
-        { icon: '♥', value: `${Math.round(s.heartRateBpm)}`, unit: 'bpm', color: '#ef4444' },
-        { icon: '⚡', value: `${s.edaMicrosiemens.toFixed(1)}`, unit: 'µS', color: '#f59e0b' },
-        { icon: '🏃', value: `${Math.round(s.activityScore)}`, unit: '', color: '#a78bfa' }
+        { icon: '\u2764', value: `${Math.round(s.heartRateBpm)}`, unit: 'bpm', color: '#ef4444' },
+        { icon: '\u26a1', value: `${s.edaMicrosiemens.toFixed(1)}`, unit: '\u00b5S', color: '#f59e0b' },
+        { icon: '\u25b2', value: `${Math.round(s.activityScore)}`, unit: '', color: '#a78bfa' }
     ];
 
     const compY = 560;

@@ -55,14 +55,14 @@
                 <div class="hud-row hud-row--buttons" role="toolbar" aria-label="Simulation controls">
                     <button id="btn-play-pause" class="control-btn hud-btn" title="Play/pause real-time simulation" aria-label="Play simulation">▶ Play</button>
                     <button id="btn-regenerate" class="control-btn hud-btn" title="Regenerate simulated data" aria-label="Regenerate data">↻ Regen</button>
-                    <button id="btn-privacy" class="control-btn hud-btn" title="Toggle privacy mode" aria-pressed="false" aria-label="Toggle privacy mode">🔓 Privacy</button>
+                    <button id="btn-privacy" class="control-btn hud-btn" title="Toggle privacy mode" aria-pressed="false" aria-label="Toggle privacy mode"><svg class="icon icon--sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg> Privacy</button>
                 </div>
 
                 <div class="hud-row hud-row--buttons" role="toolbar" aria-label="Display controls">
-                    <button id="btn-cutaway" class="control-btn hud-btn" title="Toggle dome transparency" aria-pressed="false" aria-label="Toggle cutaway view">👁 Cutaway</button>
-                    <button id="btn-crew-toggle" class="control-btn hud-btn" title="Show/hide crew members" aria-pressed="true" aria-label="Toggle crew visibility">👥 Crew</button>
-                    <button id="btn-sound" class="control-btn hud-btn" title="Toggle audio" aria-pressed="false" aria-label="Toggle sound">🔇 Sound</button>
-                    <button id="btn-tour" class="control-btn hud-btn" title="Start guided tour" aria-label="Start guided tour">🎬 Tour</button>
+                    <button id="btn-cutaway" class="control-btn hud-btn" title="Toggle dome transparency" aria-pressed="false" aria-label="Toggle cutaway view"><svg class="icon icon--sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Cutaway</button>
+                    <button id="btn-crew-toggle" class="control-btn hud-btn" title="Show/hide crew members" aria-pressed="true" aria-label="Toggle crew visibility"><svg class="icon icon--sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Crew</button>
+                    <button id="btn-sound" class="control-btn hud-btn" title="Toggle audio" aria-pressed="false" aria-label="Toggle sound"><svg class="icon icon--sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg> Sound</button>
+                    <button id="btn-tour" class="control-btn hud-btn" title="Start guided tour" aria-label="Start guided tour"><svg class="icon icon--sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/><line x1="17" y1="17" x2="22" y2="17"/></svg> Tour</button>
                 </div>
 
                 <div class="hud-divider"></div>
@@ -70,9 +70,9 @@
                 <div class="hud-row">
                     <label class="hud-label">View</label>
                     <div class="hud-view-modes" role="radiogroup" aria-label="Camera view mode">
-                        <button class="hud-mode-btn active" data-mode="overview" title="Overview camera" role="radio" aria-checked="true">🌐 Overview</button>
-                        <button class="hud-mode-btn" data-mode="firstperson" title="First-person walkthrough" role="radio" aria-checked="false">🚶 Walk</button>
-                        <button class="hud-mode-btn" data-mode="rearrange" title="Module rearrangement mode" role="radio" aria-checked="false">🔄 Rearrange</button>
+                        <button class="hud-mode-btn active" data-mode="overview" title="Overview camera" role="radio" aria-checked="true"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Overview</button>
+                        <button class="hud-mode-btn" data-mode="firstperson" title="First-person walkthrough" role="radio" aria-checked="false"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"/><path d="M9 20l3-6 3 6"/><path d="M6 15l6-3 6 3"/></svg> Walk</button>
+                        <button class="hud-mode-btn" data-mode="rearrange" title="Module rearrangement mode" role="radio" aria-checked="false"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Rearrange</button>
                     </div>
                 </div>
 
@@ -108,8 +108,8 @@
 
                 <div class="hud-nav-links" role="navigation" aria-label="Page navigation">
                     <a href="../index.html" class="hud-back-link">← Dashboard</a>
-                    <a href="wristband-3d.html" class="hud-back-link">🧊 Wristband Sci-Fi</a>
-                    <a href="wristband-product.html" class="hud-back-link">🎨 Wristband Product</a>
+                    <a href="wristband-3d.html" class="hud-back-link"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> Wristband Sci-Fi</a>
+                    <a href="wristband-product.html" class="hud-back-link"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg> Wristband Product</a>
                 </div>
             </div>
         </div>
@@ -118,7 +118,7 @@
         <div id="sensor-panel" class="sensor-panel hud-panel" role="dialog" aria-label="Sensor details">
             <div class="sensor-panel-header">
                 <span class="sensor-panel-title" id="sensor-panel-title">Sensor</span>
-                <button class="sensor-panel-close" id="sensor-panel-close" aria-label="Close sensor panel">✕</button>
+                <button class="sensor-panel-close" id="sensor-panel-close" aria-label="Close sensor panel"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
             <div class="sensor-panel-body" id="sensor-panel-body">
                 <!-- Filled dynamically -->
@@ -129,7 +129,7 @@
         <div id="module-panel" class="module-panel hud-panel" role="dialog" aria-label="Module details">
             <div class="module-panel-header">
                 <span class="module-panel-title" id="module-panel-title">Module</span>
-                <button class="module-panel-close" id="module-panel-close" aria-label="Close module panel">✕</button>
+                <button class="module-panel-close" id="module-panel-close" aria-label="Close module panel"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
             <div class="module-panel-body" id="module-panel-body">
                 <!-- Filled dynamically -->
@@ -162,9 +162,9 @@
         <div id="rearrange-toolbar" class="rearrange-toolbar hud-panel" hidden>
             <div class="rearrange-title">Module Rearrangement</div>
             <div class="rearrange-buttons">
-                <button id="btn-add-module" class="control-btn hud-btn">➕ Add Module</button>
-                <button id="btn-remove-module" class="control-btn hud-btn">🗑 Remove Module</button>
-                <button id="btn-rearrange-done" class="control-btn hud-btn hud-btn--accent">✓ Done</button>
+                <button id="btn-add-module" class="control-btn hud-btn"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Module</button>
+                <button id="btn-remove-module" class="control-btn hud-btn"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Remove Module</button>
+                <button id="btn-rearrange-done" class="control-btn hud-btn hud-btn--accent"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Done</button>
             </div>
         </div>
 
@@ -172,12 +172,12 @@
         <div id="module-picker" class="module-picker hud-panel" hidden>
             <div class="module-picker-title">Select Module Type</div>
             <div class="module-picker-grid" role="group" aria-label="Module types">
-                <button class="module-pick-btn" data-type="communal" aria-label="Add communal module">🏛 Communal</button>
-                <button class="module-pick-btn" data-type="living" aria-label="Add living module">🛏 Living</button>
-                <button class="module-pick-btn" data-type="research" aria-label="Add research module">🔬 Research</button>
-                <button class="module-pick-btn" data-type="mechanical" aria-label="Add mechanical module">⚙️ Mechanical</button>
-                <button class="module-pick-btn" data-type="cultivating" aria-label="Add cultivating module">🌱 Cultivating</button>
-                <button class="module-pick-btn" data-type="containment" aria-label="Add containment module">🚨 Containment</button>
+                <button class="module-pick-btn" data-type="communal" aria-label="Add communal module"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V9l9-7 9 7v12"/><path d="M9 21V12h6v9"/></svg> Communal</button>
+                <button class="module-pick-btn" data-type="living" aria-label="Add living module"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h2a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2V12z"/><path d="M22 12h-2a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h2V12z"/><path d="M6 12V7a6 6 0 0 1 12 0v5"/><rect x="6" y="12" width="12" height="8" rx="2"/></svg> Living</button>
+                <button class="module-pick-btn" data-type="research" aria-label="Add research module"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6v5a3 3 0 0 1-6 0V3z"/><path d="M12 8v8"/><path d="M7 19c0-2.21 2.24-4 5-4s5 1.79 5 4"/><line x1="7" y1="19" x2="7" y2="21"/><line x1="17" y1="19" x2="17" y2="21"/><line x1="6" y1="21" x2="18" y2="21"/></svg> Research</button>
+                <button class="module-pick-btn" data-type="mechanical" aria-label="Add mechanical module"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Mechanical</button>
+                <button class="module-pick-btn" data-type="cultivating" aria-label="Add cultivating module"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8c.7-1 1.04-2.13 1-3.39A6.27 6.27 0 0 0 12.52 1a5.65 5.65 0 0 0-1.04 3.39A6.2 6.2 0 0 0 17 8z"/><path d="M7 16c-.7 1-1.04 2.13-1 3.39A6.27 6.27 0 0 0 11.48 23a5.65 5.65 0 0 0 1.04-3.39A6.2 6.2 0 0 0 7 16z"/><path d="M12 8v8"/></svg> Cultivating</button>
+                <button class="module-pick-btn" data-type="containment" aria-label="Add containment module"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Containment</button>
             </div>
         </div>
     </div>

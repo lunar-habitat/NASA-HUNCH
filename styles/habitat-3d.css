@@ -37,13 +37,16 @@ body {
 /* ----- Glassmorphism Panel ----- */
 .hud-panel {
     background: rgba(10, 14, 23, 0.82);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(56, 189, 248, 0.18);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(56, 189, 248, 0.22);
     border-radius: 12px;
     padding: 1rem;
     color: var(--color-text, #e2e8f0);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+    box-shadow:
+        0 4px 24px rgba(0, 0, 0, 0.4),
+        inset 0 0 0 1px rgba(168, 85, 247, 0.06),
+        0 0 30px rgba(56, 189, 248, 0.04);
 }
 
 /* ----- Top-left control panel ----- */
@@ -97,6 +100,9 @@ body {
 .hud-divider {
     border-top: 1px solid rgba(56, 189, 248, 0.12);
     margin: 0.5rem 0;
+    background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.12) 30%, rgba(168, 85, 247, 0.10) 70%, transparent);
+    height: 1px;
+    border: none;
 }
 
 /* ----- Control elements ----- */

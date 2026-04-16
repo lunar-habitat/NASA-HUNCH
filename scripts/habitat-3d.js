@@ -14,6 +14,7 @@ import { UnrealBloomPass }    from 'three/addons/postprocessing/UnrealBloomPass.
 import { SCENARIOS, getCurrentSample, generateSeries, computeWellbeingIndex, computeStatus } from './data.js';
 import { buildHabitat, MODULE_TYPES, DEFAULT_LAYOUT, rebuildHabitat } from './habitat-geometry.js';
 import { furnishModule } from './habitat-interiors.js';
+import { icon } from './icons.js';
 
 /* ============================================
    Constants
@@ -27,24 +28,24 @@ const STATUS_COLORS = {
 
 /* Metric metadata for sensor panel display */
 const METRIC_META = {
-    heartRateBpm:       { label: 'Heart Rate',          unit: 'bpm',  min: 40,  max: 180, icon: '♥',  color: '#ef4444' },
-    hrvMs:              { label: 'HRV',                 unit: 'ms',   min: 10,  max: 150, icon: '📊', color: '#f472b6' },
-    edaMicrosiemens:    { label: 'Electrodermal',       unit: 'µS',   min: 0.1, max: 10,  icon: '⚡', color: '#facc15' },
-    skinTempC:          { label: 'Skin Temperature',    unit: '°C',   min: 30,  max: 38,  icon: '🌡', color: '#fb923c' },
-    activityScore:      { label: 'Activity',            unit: '',     min: 0,   max: 100, icon: '🏃', color: '#34d399' },
-    sleepMinutes:       { label: 'Sleep Duration',      unit: 'min',  min: 0,   max: 600, icon: '😴', color: '#818cf8' },
-    restlessnessScore:  { label: 'Restlessness',        unit: '',     min: 0,   max: 100, icon: '🫨', color: '#f97316' },
-    voiceStressIndex:   { label: 'Voice Stress',        unit: '',     min: 0,   max: 100, icon: '🎙', color: '#f472b6' },
-    pupilDilationMm:    { label: 'Pupil Dilation',      unit: 'mm',   min: 2,   max: 8,   icon: '👁', color: '#c084fc' },
-    socialScore:        { label: 'Social Interaction',   unit: '',     min: 0,   max: 100, icon: '👥', color: '#22d3ee' },
-    routineDeviation:   { label: 'Routine Deviation',   unit: '',     min: 0,   max: 100, icon: '📋', color: '#fbbf24' },
-    cognitiveLoad:      { label: 'Cognitive Load',      unit: '',     min: 0,   max: 100, icon: '🧠', color: '#a78bfa' },
-    sleepQuality:       { label: 'Sleep Quality',       unit: '',     min: 0,   max: 100, icon: '💤', color: '#818cf8' },
-    circadianAlignment: { label: 'Circadian Alignment', unit: '',     min: 0,   max: 100, icon: '🌗', color: '#fbbf24' },
-    lightSpectrumScore: { label: 'Light Spectrum',      unit: '',     min: 0,   max: 100, icon: '💡', color: '#fde68a' },
-    greeneryExposureMin:{ label: 'Greenery Exposure',   unit: 'min',  min: 0,   max: 120, icon: '🌿', color: '#4ade80' },
-    natureSoundscapeScore:{ label: 'Nature Soundscape', unit: '',     min: 0,   max: 100, icon: '🔊', color: '#67e8f9' },
-    windowSimStatus:    { label: 'Window Simulation',   unit: '',     min: 0,   max: 100, icon: '🪟', color: '#93c5fd' }
+    heartRateBpm:       { label: 'Heart Rate',          unit: 'bpm',  min: 40,  max: 180, icon: icon('heart'),       color: '#ef4444' },
+    hrvMs:              { label: 'HRV',                 unit: 'ms',   min: 10,  max: 150, icon: icon('chartBar'),    color: '#f472b6' },
+    edaMicrosiemens:    { label: 'Electrodermal',       unit: 'µS',   min: 0.1, max: 10,  icon: icon('zap'),         color: '#facc15' },
+    skinTempC:          { label: 'Skin Temperature',    unit: '°C',   min: 30,  max: 38,  icon: icon('thermometer'), color: '#fb923c' },
+    activityScore:      { label: 'Activity',            unit: '',     min: 0,   max: 100, icon: icon('activity'),    color: '#34d399' },
+    sleepMinutes:       { label: 'Sleep Duration',      unit: 'min',  min: 0,   max: 600, icon: icon('moonSleep'),   color: '#818cf8' },
+    restlessnessScore:  { label: 'Restlessness',        unit: '',     min: 0,   max: 100, icon: icon('restless'),    color: '#f97316' },
+    voiceStressIndex:   { label: 'Voice Stress',        unit: '',     min: 0,   max: 100, icon: icon('mic'),         color: '#f472b6' },
+    pupilDilationMm:    { label: 'Pupil Dilation',      unit: 'mm',   min: 2,   max: 8,   icon: icon('eye'),         color: '#c084fc' },
+    socialScore:        { label: 'Social Interaction',   unit: '',     min: 0,   max: 100, icon: icon('users'),       color: '#22d3ee' },
+    routineDeviation:   { label: 'Routine Deviation',   unit: '',     min: 0,   max: 100, icon: icon('clipboard'),   color: '#fbbf24' },
+    cognitiveLoad:      { label: 'Cognitive Load',      unit: '',     min: 0,   max: 100, icon: icon('brain'),       color: '#a78bfa' },
+    sleepQuality:       { label: 'Sleep Quality',       unit: '',     min: 0,   max: 100, icon: icon('sleepQuality'),color: '#818cf8' },
+    circadianAlignment: { label: 'Circadian Alignment', unit: '',     min: 0,   max: 100, icon: icon('circadian'),   color: '#fbbf24' },
+    lightSpectrumScore: { label: 'Light Spectrum',      unit: '',     min: 0,   max: 100, icon: icon('spectrum'),    color: '#fde68a' },
+    greeneryExposureMin:{ label: 'Greenery Exposure',   unit: 'min',  min: 0,   max: 120, icon: icon('leaf'),        color: '#4ade80' },
+    natureSoundscapeScore:{ label: 'Nature Soundscape', unit: '',     min: 0,   max: 100, icon: icon('speaker'),     color: '#67e8f9' },
+    windowSimStatus:    { label: 'Window Simulation',   unit: '',     min: 0,   max: 100, icon: icon('windowSim'),   color: '#93c5fd' }
 };
 
 /* Sensor-to-module mapping: which sensors are in which module types */
@@ -756,7 +757,9 @@ function initHUD() {
     if (playBtn) {
         playBtn.addEventListener('click', () => {
             state.playing = !state.playing;
-            playBtn.textContent = state.playing ? '⏸ Pause' : '▶ Play';
+            playBtn.innerHTML = state.playing
+                ? icon('pause', 'sm') + ' Pause'
+                : icon('play', 'sm') + ' Play';
             if (state.playing) {
                 // Init audio on user gesture if sound is enabled
                 if (state.soundEnabled) {
@@ -789,7 +792,7 @@ function initHUD() {
         privacyBtn.addEventListener('click', () => {
             state.privacyMode = !state.privacyMode;
             privacyBtn.setAttribute('aria-pressed', state.privacyMode);
-            privacyBtn.textContent = state.privacyMode ? '🔒 Privacy' : '🔓 Privacy';
+            privacyBtn.innerHTML = state.privacyMode ? icon('lock', 'sm') + ' Privacy' : icon('unlock', 'sm') + ' Privacy';
             updateWellbeingBadge();
         });
     }
@@ -820,7 +823,7 @@ function initHUD() {
         soundBtn.addEventListener('click', () => {
             state.soundEnabled = !state.soundEnabled;
             soundBtn.setAttribute('aria-pressed', state.soundEnabled);
-            soundBtn.textContent = state.soundEnabled ? '🔊 Sound' : '🔇 Sound';
+            soundBtn.innerHTML = state.soundEnabled ? icon('volumeOn', 'sm') + ' Sound' : icon('volumeOff', 'sm') + ' Sound';
             if (state.soundEnabled) {
                 // Resume AudioContext if suspended (autoplay policy)
                 if (audioListener.context.state === 'suspended') {
@@ -1459,8 +1462,8 @@ function showSensorPanel(sensorId) {
 
     const meta = METRIC_META[sensorId];
     const label = meta ? meta.label : sensorId;
-    const icon = meta ? meta.icon : '📊';
-    title.textContent = `${icon} ${label}`;
+    const icon_display = meta ? meta.icon : icon('chartBar');
+    title.innerHTML = `${icon_display} ${label}`;
 
     const val = state.sample ? state.sample[sensorId] : null;
     const displayVal = state.privacyMode ? '—' : (val !== null ? (typeof val === 'number' ? val.toFixed(1) : val) : '—');
@@ -2379,7 +2382,7 @@ function buildSystemLegend() {
 
         const name = document.createElement('span');
         name.className = 'legend-name';
-        name.textContent = `${meta.icon} ${meta.label}`;
+        name.innerHTML = `${meta.icon} ${meta.label}`;
 
         row.append(dot, cb, name);
         container.appendChild(row);
@@ -2468,4 +2471,8 @@ async function init() {
     announce('Lunar Habitat 3D simulation loaded. Use controls to explore.');
 }
 
-init();
+init().catch(err => {
+    console.error('[Habitat3D] Init failed:', err);
+    setLoadProgress(100, `Error: ${err.message}`);
+    setTimeout(hideLoadingScreen, 1500);
+});
