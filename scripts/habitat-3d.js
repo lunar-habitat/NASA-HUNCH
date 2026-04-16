@@ -120,6 +120,21 @@ const state = {
    Three.js Core Setup
    ============================================ */
 
+// Guard: WebGL must be available before any Three.js setup runs.
+// If hardware acceleration is disabled this fails at module top-level —
+// the error handler in habitat-3d.html will surface a readable message.
+{
+    const _t = document.createElement('canvas');
+    if (!(_t.getContext('webgl2') || _t.getContext('webgl'))) {
+        const s = document.getElementById('loading-status');
+        const b = document.getElementById('loading-bar-fill');
+        if (s) s.textContent = 'WebGL unavailable — this page requires hardware acceleration. ' +
+            'In Chrome go to Settings → System → enable "Use hardware acceleration when available" and restart Chrome.';
+        if (b) { b.style.width = '100%'; b.style.background = '#ef4444'; }
+        throw new Error('WebGL not available — hardware acceleration appears to be disabled');
+    }
+}
+
 const canvas   = document.getElementById('habitat-canvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));

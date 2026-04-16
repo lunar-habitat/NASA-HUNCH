@@ -6,7 +6,7 @@
 set -euo pipefail
 
 BRANCH="main"
-REMOTE="origin"
+REMOTE="nasa-hunch"
 
 # Use provided message or generate a default
 if [[ $# -gt 0 ]]; then
@@ -34,4 +34,4 @@ echo "Committed: $MSG"
 git push "$REMOTE" "$BRANCH"
 echo ""
 echo "✓ Deployed to GitHub. Site will update at:"
-echo "  https://amalikrigger.github.io/lunar-habitat/"
+echo "  https://lunar-habitat.github.io/NASA-HUNCH/"

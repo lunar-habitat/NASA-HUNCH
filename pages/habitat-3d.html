@@ -184,6 +184,22 @@
 
     <div id="a11y-live" aria-live="polite" aria-atomic="true" class="sr-only"></div>
 
+    <script>
+    // Surface module-load failures in the loading screen rather than silently freezing
+    function _showLoadError(msg) {
+        var s = document.getElementById('loading-status');
+        var b = document.getElementById('loading-bar-fill');
+        if (s) s.textContent = 'Load error — ' + msg + '. Check browser console (F12).';
+        if (b) { b.style.width = '100%'; b.style.background = '#ef4444'; }
+    }
+    window.addEventListener('error', function(e) {
+        _showLoadError(e.message || e.filename || 'unknown error');
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+        _showLoadError((e.reason && e.reason.message) ? e.reason.message : String(e.reason));
+    });
+    </script>
+
     <script type="importmap">
     {
         "imports": {
