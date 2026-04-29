@@ -880,6 +880,54 @@ body {
     outline-offset: 2px;
 }
 
+/* ----- View Selector ----- */
+.view-selector {
+    position: absolute;
+    z-index: 40;
+    min-width: 160px;
+    padding: 0.6rem;
+    pointer-events: auto;
+    animation: selector-appear 0.15s ease;
+}
+.view-selector[hidden] { display: none; }
+.view-selector-title {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-accent, #38bdf8);
+    margin-bottom: 0.4rem;
+}
+.view-selector-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.view-option-btn {
+    font-size: 0.72rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 5px;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    color: var(--color-text, #e2e8f0);
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s, border-color 0.15s;
+}
+.view-option-btn:hover {
+    background: rgba(56, 189, 248, 0.18);
+    border-color: rgba(56, 189, 248, 0.5);
+}
+.view-option-btn.active {
+    background: rgba(56, 189, 248, 0.25);
+    border-color: #38bdf8;
+    color: #38bdf8;
+}
+@keyframes selector-appear {
+    from { opacity: 0; transform: scale(0.92); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
 /* ----- Reduced motion ----- */
 @media (prefers-reduced-motion: reduce) {
     .tour-card,

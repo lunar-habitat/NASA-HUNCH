@@ -66,24 +66,24 @@ function _buildFloorTex(moduleType) {
     const ctx = cv.getContext('2d');
 
     if (moduleType === 'hub' || moduleType === 'mechanical' || moduleType === 'containment') {
-        // Dark industrial deck plate — 16×16 grid with scuff marks
-        ctx.fillStyle = '#4a4f58'; ctx.fillRect(0, 0, S, S);
+        // Clean white deck plate — 16x16 grid with subtle seams
+        ctx.fillStyle = '#ececec'; ctx.fillRect(0, 0, S, S);
         const cell = S / 16;
-        ctx.strokeStyle = 'rgba(30,33,40,0.9)'; ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(200,200,205,0.7)'; ctx.lineWidth = 1;
         for (let i = 0; i <= 16; i++) {
             ctx.beginPath(); ctx.moveTo(i * cell, 0); ctx.lineTo(i * cell, S); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(0, i * cell); ctx.lineTo(S, i * cell); ctx.stroke();
         }
         // Subtle cell fill variation
         for (let r = 0; r < 16; r++) for (let c = 0; c < 16; c++) {
-            const v = Math.random() * 18 - 9;
-            const base = 74 + v;
-            ctx.fillStyle = `rgba(${base},${base + 3},${base + 8},0.35)`;
+            const v = Math.random() * 8 - 4;
+            const base = 232 + v;
+            ctx.fillStyle = `rgba(${base},${base},${base + 2},0.25)`;
             ctx.fillRect(c * cell + 1, r * cell + 1, cell - 2, cell - 2);
         }
-        // Scuff marks
-        ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1.5;
-        for (let i = 0; i < 18; i++) {
+        // Light scuff marks
+        ctx.strokeStyle = 'rgba(180,180,185,0.15)'; ctx.lineWidth = 1.5;
+        for (let i = 0; i < 12; i++) {
             const x = Math.random() * S, y = Math.random() * S;
             const a = Math.random() * Math.PI;
             const l = 6 + Math.random() * 14;
@@ -92,78 +92,63 @@ function _buildFloorTex(moduleType) {
         }
 
     } else if (moduleType === 'living') {
-        // Soft woven matting — parallel horizontal lines
-        ctx.fillStyle = '#7a7f88'; ctx.fillRect(0, 0, S, S);
-        ctx.strokeStyle = 'rgba(200,205,215,0.28)'; ctx.lineWidth = 1;
+        // Clean white soft surface with subtle texture
+        ctx.fillStyle = '#f0f0f2'; ctx.fillRect(0, 0, S, S);
+        ctx.strokeStyle = 'rgba(210,212,218,0.25)'; ctx.lineWidth = 1;
         for (let y = 0; y < S; y += 4) {
             ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(S, y); ctx.stroke();
         }
-        // Cross-weave lighter verticals
-        ctx.strokeStyle = 'rgba(220,225,235,0.12)'; ctx.lineWidth = 0.5;
+        ctx.strokeStyle = 'rgba(215,218,225,0.12)'; ctx.lineWidth = 0.5;
         for (let x = 0; x < S; x += 8) {
             ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, S); ctx.stroke();
         }
-        // Faint pressure circle marks where sleeping platform legs sit
-        ctx.strokeStyle = 'rgba(100,105,115,0.5)'; ctx.lineWidth = 1;
+        // Faint pressure marks
+        ctx.strokeStyle = 'rgba(195,198,205,0.4)'; ctx.lineWidth = 1;
         for (const [px, py] of [[0.35, 0.45], [0.35, 0.55], [0.65, 0.45], [0.65, 0.55]]) {
             ctx.beginPath(); ctx.arc(px * S, py * S, 8, 0, Math.PI * 2); ctx.stroke();
         }
 
     } else if (moduleType === 'communal') {
-        // Warm tan synthetic linoleum
-        ctx.fillStyle = '#c2a87e'; ctx.fillRect(0, 0, S, S);
-        // Subtle diagonal sheen
+        // Clean white with subtle warmth
+        ctx.fillStyle = '#f2f0ec'; ctx.fillRect(0, 0, S, S);
         const sheen = ctx.createLinearGradient(0, 0, S, S);
-        sheen.addColorStop(0, 'rgba(255,245,225,0.12)');
-        sheen.addColorStop(0.5, 'rgba(255,245,225,0)');
-        sheen.addColorStop(1, 'rgba(255,245,225,0.08)');
+        sheen.addColorStop(0, 'rgba(255,255,255,0.1)');
+        sheen.addColorStop(0.5, 'rgba(255,255,255,0)');
+        sheen.addColorStop(1, 'rgba(255,255,255,0.06)');
         ctx.fillStyle = sheen; ctx.fillRect(0, 0, S, S);
-        // Grain noise dots
-        for (let i = 0; i < 280; i++) {
-            ctx.fillStyle = `rgba(${150 + (Math.random() * 30 | 0)},${130 + (Math.random() * 20 | 0)},90,0.38)`;
+        // Subtle grain
+        for (let i = 0; i < 180; i++) {
+            const v = 220 + (Math.random() * 20 | 0);
+            ctx.fillStyle = `rgba(${v},${v},${v - 5},0.25)`;
             const sz = 1 + Math.random();
             ctx.fillRect(Math.random() * S, Math.random() * S, sz, sz);
         }
 
     } else if (moduleType === 'research') {
-        // White lab-grade epoxy — clean with spill stains
-        ctx.fillStyle = '#eaeef2'; ctx.fillRect(0, 0, S, S);
+        // Bright white lab-grade epoxy
+        ctx.fillStyle = '#f4f6f8'; ctx.fillRect(0, 0, S, S);
         const shine = ctx.createLinearGradient(0, 0, S * 0.7, S * 0.7);
         shine.addColorStop(0, 'rgba(255,255,255,0.14)');
         shine.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.fillStyle = shine; ctx.fillRect(0, 0, S, S);
-        // Faint grid lines (lab grid marks)
-        ctx.strokeStyle = 'rgba(180,185,195,0.35)'; ctx.lineWidth = 0.5;
+        // Faint grid lines
+        ctx.strokeStyle = 'rgba(210,212,220,0.3)'; ctx.lineWidth = 0.5;
         for (let i = 0; i < S; i += 16) {
             ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, S); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(S, i); ctx.stroke();
         }
-        // Sample spill stains
-        for (const [sx, sy, sr] of [[0.3, 0.6, 12], [0.7, 0.35, 8], [0.5, 0.7, 6]]) {
-            const g = ctx.createRadialGradient(sx*S, sy*S, 0, sx*S, sy*S, sr);
-            g.addColorStop(0, 'rgba(150,200,240,0.18)');
-            g.addColorStop(1, 'rgba(150,200,240,0)');
-            ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
-        }
 
     } else if (moduleType === 'cultivating') {
-        // Drainage grating — dark slots with green tinge
-        ctx.fillStyle = '#2e3330'; ctx.fillRect(0, 0, S, S);
+        // White drainage grating with subtle slots
+        ctx.fillStyle = '#e8eae8'; ctx.fillRect(0, 0, S, S);
         const slotW = 6, slotH = 18, cols = 10, rows = 10;
         const cw = S / cols, ch = S / rows;
-        ctx.fillStyle = 'rgba(8,12,8,0.85)';
+        ctx.fillStyle = 'rgba(200,205,200,0.6)';
         for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
             const x = c * cw + (cw - slotW) / 2;
             const y = r * ch + (ch - slotH) / 2;
             ctx.fillRect(x, y, slotW, slotH);
         }
-        // Moss/algae green tinge
-        const moss = ctx.createRadialGradient(S/2, S/2, 0, S/2, S/2, S * 0.55);
-        moss.addColorStop(0, 'rgba(40,90,40,0.22)');
-        moss.addColorStop(1, 'rgba(40,90,40,0)');
-        ctx.fillStyle = moss; ctx.fillRect(0, 0, S, S);
-        // Moisture sheen
-        ctx.fillStyle = 'rgba(80,140,100,0.06)'; ctx.fillRect(0, 0, S, S);
     }
 
     const tex = new THREE.CanvasTexture(cv);
@@ -177,9 +162,9 @@ function generatePanelTexture() {
     const cv = document.createElement('canvas');
     cv.width = cv.height = S;
     const ctx = cv.getContext('2d');
-    ctx.fillStyle = '#8a8a8a'; ctx.fillRect(0, 0, S, S);
+    ctx.fillStyle = '#f0f0f0'; ctx.fillRect(0, 0, S, S);
     // Sub-panel grid lines
-    ctx.strokeStyle = 'rgba(60,60,60,0.65)'; ctx.lineWidth = 0.8;
+    ctx.strokeStyle = 'rgba(180,180,180,0.65)'; ctx.lineWidth = 0.8;
     for (const x of [S*0.33, S*0.67]) {
         ctx.beginPath(); ctx.moveTo(x, 4); ctx.lineTo(x, S-4); ctx.stroke();
     }
@@ -187,10 +172,10 @@ function generatePanelTexture() {
         ctx.beginPath(); ctx.moveTo(4, y); ctx.lineTo(S-4, y); ctx.stroke();
     }
     // Perimeter groove
-    ctx.strokeStyle = 'rgba(50,50,50,0.5)'; ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(190,190,190,0.5)'; ctx.lineWidth = 1.5;
     ctx.strokeRect(2, 2, S-4, S-4);
     // Corner bolt circles
-    ctx.fillStyle = 'rgba(55,55,55,0.75)';
+    ctx.fillStyle = 'rgba(180,180,180,0.75)';
     for (const [bx, by] of [[7,7],[S-7,7],[7,S-7],[S-7,S-7]]) {
         ctx.beginPath(); ctx.arc(bx, by, 3, 0, Math.PI*2); ctx.fill();
     }
@@ -527,12 +512,12 @@ function createSensorHotspot(x, y, z, sensorId) {
 
 function addInteriorLights(group, radius) {
     // Warm ceiling light
-    const ceilingLight = new THREE.PointLight(0xffeedd, 0.6, radius * 2.5);
+    const ceilingLight = new THREE.PointLight(0xffeedd, 0.7, radius * 2.5);
     ceilingLight.position.set(0, radius * 0.65, 0);
     ceilingLight.userData.isCircadianLight = true;
     group.add(ceilingLight);
 
-    // Accent strip glow — emissive-only ring (no PointLight) to save draw calls
+    // Accent strip glow — emissive ring at low height
     const stripGeo = new THREE.TorusGeometry(radius * 0.8, 0.03, 4, 16);
     const stripMat = new THREE.MeshStandardMaterial({
         color: 0x38bdf8,
@@ -1346,8 +1331,8 @@ function addCircadianCeilingFixtures(group, radius) {
    ============================================ */
 
 function addDomePerimeterPillars(group, radius) {
-    const columnMat = new THREE.MeshStandardMaterial({ color: 0xb0b8c4, metalness: 0.7, roughness: 0.3 });
-    const capMat = new THREE.MeshStandardMaterial({ color: 0xc8cdd4, metalness: 0.6, roughness: 0.35 });
+    const columnMat = new THREE.MeshStandardMaterial({ color: 0xe8e8e8, metalness: 0.4, roughness: 0.35 });
+    const capMat = new THREE.MeshStandardMaterial({ color: 0xf0f0f0, metalness: 0.35, roughness: 0.4 });
     const ledMat = new THREE.MeshStandardMaterial({
         color: 0x38bdf8, emissive: 0x38bdf8, emissiveIntensity: 0.5,
         transparent: true, opacity: 0.8
@@ -1385,24 +1370,57 @@ function addDomePerimeterPillars(group, radius) {
    Handrail Helper
    ============================================ */
 
-function addHandrailRing(group, radius, y, color = 0xc8cdd4) {
+/**
+ * Grey handrail system for lunar 1/6g movement.
+ * Astronauts use hand-over-hand locomotion in low gravity,
+ * so rails are provided at multiple heights with vertical
+ * connecting bars for continuous grip paths.
+ */
+const HANDRAIL_MAT = new THREE.MeshStandardMaterial({ color: 0x808080, metalness: 0.55, roughness: 0.4 });
+const HANDRAIL_BRACKET_MAT = new THREE.MeshStandardMaterial({ color: 0x909090, metalness: 0.5, roughness: 0.45 });
+
+function addHandrailRing(group, radius, y) {
     const rail = new THREE.Mesh(
-        new THREE.TorusGeometry(radius * 0.84, 0.025, 6, 48),
-        new THREE.MeshStandardMaterial({ color, metalness: 0.75, roughness: 0.25 })
+        new THREE.TorusGeometry(radius * 0.84, 0.022, 8, 48),
+        HANDRAIL_MAT
     );
     rail.rotation.x = Math.PI / 2;
     rail.position.y = y;
     group.add(rail);
 
-    // Mounting brackets every 45°
+    // Mounting brackets every 45deg
     for (let i = 0; i < 8; i++) {
         const a = (i / 8) * Math.PI * 2;
         const bracket = new THREE.Mesh(
-            new THREE.BoxGeometry(0.04, 0.12, 0.04),
-            new THREE.MeshStandardMaterial({ color: 0xdde3ea, metalness: 0.5 })
+            new THREE.CylinderGeometry(0.015, 0.015, 0.12, 6),
+            HANDRAIL_BRACKET_MAT
         );
         bracket.position.set(Math.cos(a) * radius * 0.84, y - 0.06, Math.sin(a) * radius * 0.84);
         group.add(bracket);
+    }
+}
+
+/**
+ * Add vertical connecting rails between the ring heights.
+ * These let astronauts transition between levels in 1/6g
+ * without losing grip.
+ */
+function addVerticalHandrails(group, radius) {
+    const lowerY = 0.9;
+    const upperY = 2.0;
+    const span = upperY - lowerY;
+
+    for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        const x = Math.cos(a) * radius * 0.84;
+        const z = Math.sin(a) * radius * 0.84;
+
+        const vert = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.018, 0.018, span, 6),
+            HANDRAIL_MAT
+        );
+        vert.position.set(x, lowerY + span / 2, z);
+        group.add(vert);
     }
 }
 
@@ -1422,18 +1440,6 @@ const PARTICLE_MAP = {
 export function furnishModule(moduleGroup, moduleType) {
     const radius = moduleGroup.userData.domeRadius || 5;
 
-    // Apply floor texture to any mesh flagged as the module floor
-    moduleGroup.traverse(child => {
-        if (child.isMesh && child.userData.isModuleFloor) {
-            const tex = getFloorTexture(moduleType);
-            child.material = child.material.clone();
-            child.material.map = tex;
-            child.material.color.set(0xffffff);
-            child.material.roughness = 0.82;
-            child.material.needsUpdate = true;
-        }
-    });
-
     // Apply panel texture to opaque outer panels
     moduleGroup.traverse(child => {
         if (child.isMesh && child.userData.isOuterPanel && child.userData.panelType === 'opaque') {
@@ -1444,46 +1450,15 @@ export function furnishModule(moduleGroup, moduleType) {
         }
     });
 
-    // Type-specific furnishing — wrap in LOD
-    const furnisher = FURNISH_MAP[moduleType];
-    if (furnisher) {
-        const detailGroup = new THREE.Group();
-        furnisher(detailGroup, radius);
+    // Grey handrail system for 1/6g lunar movement (every module)
+    addHandrailRing(moduleGroup, radius, 0.9);  // waist height
+    addHandrailRing(moduleGroup, radius, 1.4);  // chest height
+    addHandrailRing(moduleGroup, radius, 2.0);  // overhead pull bar
+    addVerticalHandrails(moduleGroup, radius);   // vertical connectors
 
-        // Simplified LOD level — single box approximation
-        const simpleGroup = new THREE.Group();
-        const box = new THREE.Mesh(
-            SHARED_GEO.lodBox,
-            new THREE.MeshStandardMaterial({ color: 0x4a5568, transparent: true, opacity: 0.3 })
-        );
-        box.scale.set(radius * 0.8, radius * 0.4, radius * 0.8);
-        box.position.y = radius * 0.2;
-        simpleGroup.add(box);
-
-        const lod = new THREE.LOD();
-        lod.addLevel(detailGroup, 0);    // Full detail when close
-        lod.addLevel(simpleGroup, 35);   // Simplified box at distance
-        lod.addLevel(new THREE.Group(), 80); // Invisible at far distance
-        moduleGroup.add(lod);
-    }
-
-    // Greenery throughout (every module)
-    addGreenery(moduleGroup, radius);
-
-    // Dome perimeter pillars (every module)
-    addDomePerimeterPillars(moduleGroup, radius);
-
-    // Handrail rings for zero-g movement (every module)
-    addHandrailRing(moduleGroup, radius, 1.1); // chest height
-    addHandrailRing(moduleGroup, radius, 2.0); // overhead pull bar
-
-    // Interior circadian-responsive lighting (every module)
+    // Interior circadian-responsive lighting with LED strips (every module)
     addInteriorLights(moduleGroup, radius);
 
     // Circadian ceiling fixtures (every module)
     addCircadianCeilingFixtures(moduleGroup, radius);
-
-    // Module-specific particle effects
-    const particleFn = PARTICLE_MAP[moduleType];
-    if (particleFn) particleFn(moduleGroup, radius);
 }

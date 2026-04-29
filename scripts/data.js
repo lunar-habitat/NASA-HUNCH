@@ -23,7 +23,6 @@ export const SCENARIOS = {
         activityScore: 25,
         sleepMinutes: 432,   // 7.2 hours
         restlessnessScore: 15,
-        voiceStressIndex: 15,
         pupilDilationMm: 3.2,
         socialScore: 70,
         routineDeviation: 12,
@@ -43,7 +42,6 @@ export const SCENARIOS = {
         activityScore: 40,
         sleepMinutes: 300,   // 5 hours
         restlessnessScore: 65,
-        voiceStressIndex: 72,
         pupilDilationMm: 5.8,
         socialScore: 35,
         routineDeviation: 55,
@@ -63,7 +61,6 @@ export const SCENARIOS = {
         activityScore: 15,
         sleepMinutes: 210,   // 3.5 hours
         restlessnessScore: 80,
-        voiceStressIndex: 45,
         pupilDilationMm: 4.5,
         socialScore: 40,
         routineDeviation: 65,
@@ -83,7 +80,6 @@ export const SCENARIOS = {
         activityScore: 92,
         sleepMinutes: 420,   // 7 hours
         restlessnessScore: 20,
-        voiceStressIndex: 25,
         pupilDilationMm: 4.0,
         socialScore: 65,
         routineDeviation: 20,
@@ -95,46 +91,6 @@ export const SCENARIOS = {
         natureSoundscapeScore: 60,
         windowSimStatus: 78
     },
-    eva: {
-        heartRateBpm: 115,
-        hrvMs: 25,
-        edaMicrosiemens: 4.8,
-        skinTempC: 35.2,
-        activityScore: 78,
-        sleepMinutes: 390,   // 6.5 hours
-        restlessnessScore: 35,
-        voiceStressIndex: 50,
-        pupilDilationMm: 5.2,
-        socialScore: 55,
-        routineDeviation: 40,
-        cognitiveLoad: 72,
-        sleepQuality: 55,
-        circadianAlignment: 60,
-        lightSpectrumScore: 60,
-        greeneryExposureMin: 10,
-        natureSoundscapeScore: 30,
-        windowSimStatus: 45
-    },
-    microgravity: {
-        heartRateBpm: 62,
-        hrvMs: 55,
-        edaMicrosiemens: 0.8,
-        skinTempC: 33.4,
-        activityScore: 8,
-        sleepMinutes: 450,   // 7.5 hours
-        restlessnessScore: 10,
-        voiceStressIndex: 10,
-        pupilDilationMm: 3.0,
-        socialScore: 60,
-        routineDeviation: 15,
-        cognitiveLoad: 18,
-        sleepQuality: 82,
-        circadianAlignment: 75,
-        lightSpectrumScore: 80,
-        greeneryExposureMin: 70,
-        natureSoundscapeScore: 80,
-        windowSimStatus: 85
-    },
     emergency: {
         heartRateBpm: 125,
         hrvMs: 15,
@@ -143,7 +99,6 @@ export const SCENARIOS = {
         activityScore: 65,
         sleepMinutes: 180,   // 3 hours
         restlessnessScore: 90,
-        voiceStressIndex: 85,
         pupilDilationMm: 7.0,
         socialScore: 30,
         routineDeviation: 80,
@@ -163,7 +118,6 @@ export const SCENARIOS = {
         activityScore: 5,
         sleepMinutes: 240,   // 4 hours — insomnia from isolation
         restlessnessScore: 75,
-        voiceStressIndex: 60,
         pupilDilationMm: 4.8,
         socialScore: 10,
         routineDeviation: 70,
@@ -217,7 +171,6 @@ const NOISE_PROFILES = {
     skinTempC:         { stdDev: 0.15, reversion: 0.1,  min: 30.0, max: 38.0 },
     activityScore:     { stdDev: 5,    reversion: 0.12, min: 0,    max: 100 },
     restlessnessScore: { stdDev: 4,    reversion: 0.1,  min: 0,    max: 100 },
-    voiceStressIndex:  { stdDev: 5,    reversion: 0.1,  min: 0,    max: 100 },
     pupilDilationMm:   { stdDev: 0.2,  reversion: 0.1,  min: 2.0,  max: 8.0 },
     socialScore:       { stdDev: 3,    reversion: 0.08, min: 0,    max: 100 },
     routineDeviation:  { stdDev: 4,    reversion: 0.1,  min: 0,    max: 100 },
@@ -273,7 +226,6 @@ export function generateSeries(scenario, minutes = 60) {
             activityScore:     Math.round(current.activityScore),
             sleepMinutes:      center.sleepMinutes,
             restlessnessScore: Math.round(current.restlessnessScore),
-            voiceStressIndex:  Math.round(current.voiceStressIndex),
             pupilDilationMm:   current.pupilDilationMm,
             socialScore:       Math.round(current.socialScore),
             routineDeviation:  Math.round(current.routineDeviation),
@@ -304,7 +256,6 @@ export function generateSeries(scenario, minutes = 60) {
  *   Sleep Duration:  sleepMinutes / 480 × 100
  *   Restlessness:    100 − restlessnessScore
  *   Activity:        bell-curve around 35
- *   Voice Stress:    100 − voiceStressIndex
  *   Pupil Dilation:  100 − ((pupil − 2) / 6) × 100
  *   Social:          socialScore directly
  *   Routine Dev:     100 − routineDeviation
@@ -317,9 +268,9 @@ export function generateSeries(scenario, minutes = 60) {
  *   Window Sim:      windowSimStatus directly
  *
  * Final index = weighted average, clamped 0–100.
- * Weights: HR(8%), HRV(8%), EDA(6%), SleepDur(8%), Restlessness(6%),
- *          Activity(4%), VoiceStress(7%), Pupil(6%), Social(6%),
- *          RoutineDev(4%), CogLoad(6%), SleepQuality(7%), Circadian(6%),
+ * Weights: HR(10%), HRV(8%), EDA(8%), SleepDur(8%), Restlessness(6%),
+ *          Activity(4%), Pupil(8%), Social(6%),
+ *          RoutineDev(4%), CogLoad(6%), SleepQuality(8%), Circadian(6%),
  *          LightSpectrum(5%), Greenery(4%), Soundscape(4%), WindowSim(5%)
  *
  * If `rollingWindow` is provided, metrics are averaged across the
@@ -341,7 +292,6 @@ export function computeWellbeingIndex(sample, rollingWindow = null) {
             sleepMinutes:       rollingWindow.reduce((s, p) => s + p.sleepMinutes, 0) / len,
             restlessnessScore:  rollingWindow.reduce((s, p) => s + (p.restlessnessScore || 0), 0) / len,
             activityScore:      rollingWindow.reduce((s, p) => s + (p.activityScore || 0), 0) / len,
-            voiceStressIndex:   rollingWindow.reduce((s, p) => s + (p.voiceStressIndex ?? 15), 0) / len,
             pupilDilationMm:    rollingWindow.reduce((s, p) => s + (p.pupilDilationMm ?? 3.2), 0) / len,
             socialScore:        rollingWindow.reduce((s, p) => s + (p.socialScore ?? 70), 0) / len,
             routineDeviation:   rollingWindow.reduce((s, p) => s + (p.routineDeviation ?? 12), 0) / len,
@@ -368,10 +318,6 @@ export function computeWellbeingIndex(sample, rollingWindow = null) {
     const act = effective.activityScore ?? 30;
     const actComponent = clamp(100 - Math.abs(act - 35) * 1.2, 0, 100);
 
-    // Voice Stress: 0 is calm, 100 is extreme stress
-    const voiceStress = effective.voiceStressIndex ?? 15;
-    const voiceComponent = clamp(100 - voiceStress, 0, 100);
-
     // Pupil Dilation: 2mm is calm baseline, 8mm is extreme
     const pupil = effective.pupilDilationMm ?? 3.2;
     const pupilComponent = clamp(100 - ((pupil - 2.0) / 6.0) * 100, 0, 100);
@@ -387,7 +333,7 @@ export function computeWellbeingIndex(sample, rollingWindow = null) {
     const cogLoad = effective.cognitiveLoad ?? 30;
     const cogComponent = clamp(100 - cogLoad * 0.8, 0, 100);
 
-    // Sleep quality: higher is better (from mattress pressure sensors)
+    // Sleep quality: higher is better (from sleeping bag pressure sensors)
     const sleepQualComponent = clamp(effective.sleepQuality ?? 78, 0, 100);
 
     // Circadian alignment: higher is better (LED panel + rhythm tracking)
@@ -406,19 +352,18 @@ export function computeWellbeingIndex(sample, rollingWindow = null) {
     // Window simulation: higher is better
     const windowSimComponent = clamp(effective.windowSimStatus ?? 82, 0, 100);
 
-    // Rebalanced weighted average across all 17 components (sum = 1.00)
-    const avg = hrComponent       * 0.08
+    // Rebalanced weighted average across all 16 components (sum = 1.00)
+    const avg = hrComponent       * 0.10
              + hrvComponent      * 0.08
-             + edaComponent      * 0.06
+             + edaComponent      * 0.08
              + sleepComponent    * 0.08
              + restComponent     * 0.06
              + actComponent      * 0.04
-             + voiceComponent    * 0.07
-             + pupilComponent    * 0.06
+             + pupilComponent    * 0.08
              + socialComponent   * 0.06
              + routineComponent  * 0.04
              + cogComponent      * 0.06
-             + sleepQualComponent * 0.07
+             + sleepQualComponent * 0.08
              + circadianComponent * 0.06
              + lightSpectrumComponent * 0.05
              + greeneryComponent * 0.04

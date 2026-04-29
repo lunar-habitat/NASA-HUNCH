@@ -57,12 +57,6 @@ const SENSOR_INFO = [
 /** Habitat-integrated sensor definitions — not on wristband, monitored via habitat systems */
 const HABITAT_SENSOR_INFO = [
     {
-        id: 'voice', name: 'Voice Stress', icon: icon('mic'),
-        unit: 'score 0–100', range: '0–100', key: 'voiceStressIndex',
-        why: 'Voice recognition analysis detects stress markers, tremor, and tonal shifts',
-        systemId: 'voiceRecognition'
-    },
-    {
         id: 'pupil', name: 'Pupil Dilation', icon: icon('eye'),
         unit: 'mm', range: '2.0–8.0', key: 'pupilDilationMm',
         why: 'Pupillometer scans measure dilation correlated with cognitive load and stress',
@@ -89,8 +83,8 @@ const HABITAT_SENSOR_INFO = [
     {
         id: 'sleepQuality', name: 'Sleep Stage Quality', icon: icon('sleepQuality'),
         unit: 'score 0–100', range: '0–100', key: 'sleepQuality',
-        why: 'Mattress pressure sensors monitor deep/REM/light sleep stage composition',
-        systemId: 'mattressSensors'
+        why: 'Sleeping bag pressure sensors monitor deep/REM/light sleep stage composition',
+        systemId: 'sleepingBagSensors'
     },
     {
         id: 'circadian', name: 'Circadian Alignment', icon: icon('circadian'),
@@ -131,15 +125,6 @@ const HABITAT_SENSOR_INFO = [
 /** Monitoring systems — each maps to a set of metrics */
 const SYSTEMS = [
     {
-        id: 'voiceRecognition',
-        name: 'Voice Recognition / Analysis',
-        icon: icon('mic'),
-        color: '#fb923c',
-        description: 'Vocal biomarker analysis detecting stress, fatigue, and emotional state through speech patterns',
-        metrics: ['voiceStressIndex'],
-        kpiKeys: ['voice']
-    },
-    {
         id: 'facialScans',
         name: 'Facial Scans (Pupillometer)',
         icon: icon('eye'),
@@ -153,7 +138,7 @@ const SYSTEMS = [
         name: 'Behavioral Pattern Analysis',
         icon: icon('chartBar'),
         color: '#2dd4bf',
-        description: 'Camera-free monitoring of movement patterns, social withdrawal, daily routine changes, door usage, workstation interaction, and task completion timing',
+        description: 'Camera-free monitoring via doorway sensors and workstation interactions. In lunar microgravity (1/6 g), crew locomotion is a bounding low-g gait — deviations from expected movement patterns, social withdrawal, and changes in routine are early stress indicators',
         metrics: ['socialScore', 'routineDeviation', 'cognitiveLoad', 'activityScore'],
         kpiKeys: ['social', 'routine', 'cognitive', 'activity']
     },
@@ -162,16 +147,16 @@ const SYSTEMS = [
         name: 'HRV Monitoring (Wristband)',
         icon: icon('heartPulse'),
         color: '#ef4444',
-        description: 'Wristband-integrated heart rate variability monitoring for stress levels, emotional regulation, fatigue, and anxiety detection',
+        description: 'Wristband sensors monitor HRV, EDA, skin temperature, and heart rate. Reduced gravitational load on the Moon alters cardiovascular demand — baseline HRV and resting HR shift over a mission, making continuous tracking essential for detecting stress, fatigue, and deconditioning',
         metrics: ['heartRateBpm', 'hrvMs', 'edaMicrosiemens', 'skinTempC'],
         kpiKeys: ['hr', 'hrv', 'eda', 'temp']
     },
     {
-        id: 'mattressSensors',
-        name: 'Mattress Pressure Sensors',
+        id: 'sleepingBagSensors',
+        name: 'Sleeping Bag Pressure Sensors',
         icon: icon('bed'),
         color: '#60a5fa',
-        description: 'Sleep monitoring via pressure sensors: sleep duration, sleep stages, restlessness, and circadian misalignment detection',
+        description: 'Pressure sensors embedded in sleeping bags track sleep duration, stages, and restlessness. In lunar gravity, crew are anchored inside the bag to prevent drifting from low-g body movements during sleep — sensor contact is maintained throughout the rest cycle, enabling reliable stage and circadian alignment data',
         metrics: ['sleepMinutes', 'sleepQuality', 'restlessnessScore'],
         kpiKeys: ['sleep', 'sleepQuality']
     },
@@ -180,7 +165,7 @@ const SYSTEMS = [
         name: 'Circadian Light Panel',
         icon: icon('sun'),
         color: '#facc15',
-        description: 'LED technology replicating Earth light spectrum and day-night rhythm to maintain healthy circadian cycles',
+        description: 'LED panels replicate Earth\'s full light spectrum and day-night rhythm. The lunar day lasts 29.5 Earth days, making artificial circadian cues essential — without them, the body\'s 24-hour biological clock drifts rapidly, degrading sleep, mood, and cognitive performance',
         metrics: ['circadianAlignment', 'lightSpectrumScore'],
         kpiKeys: ['circadian', 'lightSpectrum']
     },
@@ -189,7 +174,7 @@ const SYSTEMS = [
         name: 'Greenery & Nature Simulation',
         icon: icon('leaf'),
         color: '#22c55e',
-        description: 'Earth-like visual and auditory environments: greenery window backgrounds, dynamic scenery, and ambient nature soundscapes',
+        description: 'The lunar surface is grey, airless, and visually stark. Window simulations replace the view with Earth landscapes — forests, oceans, mountains — with matching ambient soundscapes. Greenery and natural imagery are proven countermeasures for confinement stress and psychological monotony',
         metrics: ['greeneryExposureMin', 'natureSoundscapeScore', 'windowSimStatus'],
         kpiKeys: ['greenery', 'soundscape', 'windowSim']
     }
@@ -264,7 +249,6 @@ function formatReading(sensor, sample) {
         case 'temp':     return `${formatNumber(v, 1)} °C`;
         case 'activity': return `${v} / 100`;
         case 'sleep':    return `${formatNumber(v / 60, 1)} hours`;
-        case 'voice':    return `${v} / 100`;
         case 'pupil':    return `${formatNumber(v, 1)} mm`;
         case 'social':   return `${v} / 100`;
         case 'routine':  return `${v} / 100`;
@@ -312,7 +296,6 @@ function privacyMask(value, sensorId) {
         case 'sleep': {
             return numVal >= 7 ? 'Adequate' : 'Below target';
         }
-        case 'voice':
         case 'social':
         case 'routine':
         case 'cognitive':
@@ -600,7 +583,6 @@ function renderKPIs(sample, series, container = null, systemId = null) {
         { icon: icon('thermometer'), label: 'Skin Temp',  value: sample.skinTempC.toFixed(1),      unit: '°C', sensorId: 'temp', metricKey: 'skinTempC' },
         { icon: icon('activity'),    label: 'Activity',   value: Math.round(sample.activityScore), unit: '/100', sensorId: 'activity', metricKey: 'activityScore' },
         { icon: icon('moonSleep'),   label: 'Sleep',      value: (sample.sleepMinutes / 60).toFixed(1), unit: 'hrs', sensorId: 'sleep', metricKey: 'sleepMinutes' },
-        { icon: icon('mic'),         label: 'Voice Stress',  value: Math.round(sample.voiceStressIndex ?? 15),  unit: '/100', sensorId: 'voice', metricKey: 'voiceStressIndex' },
         { icon: icon('eye'),         label: 'Pupil Dilation', value: (sample.pupilDilationMm ?? 3.2).toFixed(1), unit: 'mm',   sensorId: 'pupil', metricKey: 'pupilDilationMm' },
         { icon: icon('users'),       label: 'Social',         value: Math.round(sample.socialScore ?? 70),        unit: '/100', sensorId: 'social', metricKey: 'socialScore' },
         { icon: icon('clipboard'),   label: 'Routine Dev.',   value: Math.round(sample.routineDeviation ?? 12),   unit: '/100', sensorId: 'routine', metricKey: 'routineDeviation' },
@@ -685,13 +667,9 @@ function renderInsights(sample, series) {
 
     // --- Habitat-integrated mental health insight rules ---
 
-    // Combined danger: social withdrawal + stress
-    if ((sample.socialScore ?? 70) < 25 && (sample.voiceStressIndex ?? 15) > 50) {
-        allInsights.push({ icon: icon('alertDanger'), text: 'Social withdrawal with elevated stress — priority mental health assessment', level: 'danger' });
-    }
-
-    if ((sample.voiceStressIndex ?? 15) > 60) {
-        allInsights.push({ icon: icon('mic'), text: 'Elevated vocal stress markers — consider private counseling session', level: 'warning' });
+    // Combined danger: social withdrawal + elevated EDA
+    if ((sample.socialScore ?? 70) < 25 && sample.edaMicrosiemens > 4) {
+        allInsights.push({ icon: icon('alertDanger'), text: 'Social withdrawal with elevated stress markers — priority mental health assessment', level: 'danger' });
     }
     if ((sample.pupilDilationMm ?? 3.2) > 6.0) {
         allInsights.push({ icon: icon('eye'), text: 'Sustained pupil dilation — high cognitive demand or acute stress', level: 'warning' });
@@ -706,7 +684,7 @@ function renderInsights(sample, series) {
         allInsights.push({ icon: icon('brain'), text: 'High cognitive load — recommend task redistribution or break', level: 'warning' });
     }
     if ((sample.sleepQuality ?? 78) < 30) {
-        allInsights.push({ icon: icon('sleepQuality'), text: 'Poor sleep stage composition — review mattress and environment factors', level: 'danger' });
+        allInsights.push({ icon: icon('sleepQuality'), text: 'Poor sleep stage composition — review sleeping bag and environment factors', level: 'danger' });
     }
     if ((sample.circadianAlignment ?? 85) < 40) {
         allInsights.push({ icon: icon('circadian'), text: 'Circadian misalignment — adjust LED light panel schedule', level: 'warning' });
@@ -714,7 +692,6 @@ function renderInsights(sample, series) {
 
     // Environmental cue: nature simulation recommendation
     const stressIndicators = [
-        (sample.voiceStressIndex ?? 15) > 50,
         sample.edaMicrosiemens > 4,
         (sample.cognitiveLoad ?? 30) > 60,
         (sample.socialScore ?? 70) < 30,
@@ -832,8 +809,6 @@ function initControls() {
                 stress: 'Stress Spike',
                 sleepDeprived: 'Sleep Deprived',
                 exercise: 'High Activity',
-                eva: 'EVA Spacewalk',
-                microgravity: 'Microgravity Rest',
                 emergency: 'Emergency Alert',
                 isolation: 'Social Isolation'
             };
@@ -1227,9 +1202,6 @@ function computeSystemHealth(systemId, sample) {
             case 'sleepMinutes':
                 score = ((sample.sleepMinutes ?? 432) / 480) * 100;
                 break;
-            case 'voiceStressIndex':
-                score = 100 - (sample.voiceStressIndex ?? 15);
-                break;
             case 'pupilDilationMm':
                 score = 100 - (((sample.pupilDilationMm ?? 3.2) - 2.0) / 6.0) * 100;
                 break;
@@ -1284,18 +1256,6 @@ function computeSystemHealth(systemId, sample) {
  */
 function renderSystemCharts(systemId, series, container, latestSample) {
     switch (systemId) {
-        case 'voiceRecognition': {
-            // Voice Stress single line
-            const voiceData = series.map(p => ({ value: p.voiceStressIndex ?? 15, label: `${Math.round(p.voiceStressIndex ?? 15)} stress` }));
-            const card = createElement('div', 'chart-card card');
-            card.innerHTML = '<h3>Voice Stress Index</h3>';
-            container.appendChild(card);
-            const chart = createChart(card, { yMin: 0, yMax: 100, lineColor: '#fb923c', yLabel: 'score' });
-            chart.update(voiceData);
-            chart.canvas.setAttribute('role', 'img');
-            chart.canvas.setAttribute('aria-label', 'Voice stress index trend from speech analysis');
-            break;
-        }
         case 'facialScans': {
             // Pupil Dilation single line
             const pupilData = series.map(p => ({ value: p.pupilDilationMm ?? 3.2, label: `${(p.pupilDilationMm ?? 3.2).toFixed(1)} mm` }));
@@ -1384,7 +1344,7 @@ function renderSystemCharts(systemId, series, container, latestSample) {
             chart3.canvas.setAttribute('aria-label', 'Skin temperature trend in Celsius');
             break;
         }
-        case 'mattressSensors': {
+        case 'sleepingBagSensors': {
             // Sleep Duration & Restlessness dual line
             const sleepDurData = series.map(p => ({ value: (p.sleepMinutes ?? 432) / 60, label: `${((p.sleepMinutes ?? 432) / 60).toFixed(1)} hrs` }));
             const restlessData = series.map(p => ({ value: (p.restlessnessScore ?? 15), label: `${Math.round(p.restlessnessScore ?? 15)} restless` }));
@@ -1412,7 +1372,7 @@ function renderSystemCharts(systemId, series, container, latestSample) {
             const chart2 = createChart(card2, { yMin: 0, yMax: 100, lineColor: '#60a5fa', yLabel: 'score' });
             chart2.update(sqData);
             chart2.canvas.setAttribute('role', 'img');
-            chart2.canvas.setAttribute('aria-label', 'Sleep stage quality from mattress pressure sensors');
+            chart2.canvas.setAttribute('aria-label', 'Sleep stage quality from sleeping bag pressure sensors');
             break;
         }
         case 'circadianLight': {

@@ -45,8 +45,6 @@
                         <option value="stress">Stress Spike</option>
                         <option value="sleepDeprived">Sleep Deprived</option>
                         <option value="exercise">High Activity</option>
-                        <option value="eva">EVA Spacewalk</option>
-                        <option value="microgravity">Microgravity Rest</option>
                         <option value="emergency">Emergency Alert</option>
                         <option value="isolation">Social Isolation</option>
                     </select>
@@ -165,6 +163,19 @@
                 <button id="btn-add-module" class="control-btn hud-btn"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Module</button>
                 <button id="btn-remove-module" class="control-btn hud-btn"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Remove Module</button>
                 <button id="btn-rearrange-done" class="control-btn hud-btn hud-btn--accent"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Done</button>
+            </div>
+        </div>
+
+        <!-- View selector popup (shown when clicking a window panel) -->
+        <div id="view-selector" class="view-selector hud-panel" hidden role="dialog" aria-label="Window view selector">
+            <div class="view-selector-title">Window View</div>
+            <div class="view-selector-options">
+                <button class="view-option-btn" data-view="earth">Earth</button>
+                <button class="view-option-btn" data-view="forest">Forest</button>
+                <button class="view-option-btn" data-view="ocean">Ocean</button>
+                <button class="view-option-btn" data-view="mountain">Mountain</button>
+                <button class="view-option-btn" data-view="aurora">Aurora</button>
+                <button class="view-option-btn" data-view="opaque">Opaque</button>
             </div>
         </div>
 

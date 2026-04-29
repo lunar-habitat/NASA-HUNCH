@@ -19,7 +19,6 @@ const FIELD_DEFS = {
     activityScore:     { type: 'number', min: 0,    max: 100,  decimals: 0 },
     sleepMinutes:      { type: 'number', min: 0,    max: 600,  decimals: 0 },
     restlessnessScore: { type: 'number', min: 0,    max: 100,  decimals: 0 },
-    voiceStressIndex:  { type: 'number', min: 0,    max: 100,  decimals: 0 },
     pupilDilationMm:   { type: 'number', min: 2.0,  max: 8.0,  decimals: 1 },
     socialScore:       { type: 'number', min: 0,    max: 100,  decimals: 0 },
     routineDeviation:  { type: 'number', min: 0,    max: 100,  decimals: 0 },
@@ -53,9 +52,6 @@ const ALIASES = {
     'sleep_minutes':    'sleepMinutes',
     'restlessness':     'restlessnessScore',
     'restlessness_score': 'restlessnessScore',
-    'voice_stress':     'voiceStressIndex',
-    'voicestress':      'voiceStressIndex',
-    'voice':            'voiceStressIndex',
     'pupil':            'pupilDilationMm',
     'pupil_dilation':   'pupilDilationMm',
     'pupildilation':    'pupilDilationMm',
@@ -266,7 +262,6 @@ export function validateSeries(rows) {
         point.activityScore = Math.round(point.activityScore);
         point.sleepMinutes = Math.round(point.sleepMinutes);
         point.restlessnessScore = Math.round(point.restlessnessScore);
-        point.voiceStressIndex = Math.round(point.voiceStressIndex ?? 15);
         point.socialScore = Math.round(point.socialScore ?? 70);
         point.routineDeviation = Math.round(point.routineDeviation ?? 12);
         point.cognitiveLoad = Math.round(point.cognitiveLoad ?? 30);
@@ -306,7 +301,6 @@ function getDefaultValue(fieldKey) {
         activityScore: 25,
         sleepMinutes: 420,
         restlessnessScore: 15,
-        voiceStressIndex: 15,
         pupilDilationMm: 3.2,
         socialScore: 70,
         routineDeviation: 12,
@@ -374,7 +368,6 @@ export function getFormatHelp() {
         <code>activityScore</code> (0–100)<br>
         <code>sleepMinutes</code> (0–600)<br>
         <code>restlessnessScore</code> (0–100)<br>
-        <code>voiceStressIndex</code> (0–100)<br>
         <code>pupilDilationMm</code> (2.0–8.0)<br>
         <code>socialScore</code> (0–100)<br>
         <code>routineDeviation</code> (0–100)<br>
@@ -386,7 +379,7 @@ export function getFormatHelp() {
         <code>natureSoundscapeScore</code> (0–100)<br>
         <code>windowSimStatus</code> (0–100)<br>
         <br>
-        <strong>Aliases accepted:</strong> hr, hrv, eda, temp, activity, sleep, restlessness, voice, pupil, social, routine, cognitive, circadian, spectrum, greenery, soundscape, window<br>
+        <strong>Aliases accepted:</strong> hr, hrv, eda, temp, activity, sleep, restlessness, pupil, social, routine, cognitive, circadian, spectrum, greenery, soundscape, window<br>
         <strong>Formats:</strong> .csv (comma-separated) or .json (array of objects)
     `;
 }

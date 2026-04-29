@@ -16,7 +16,7 @@ Records: Door usage, Workstation interaction, Task completion timing
 Heart Rate Variability (HRV) Monitoring
 Monitors: Stress levels, Emotional regulation, Fatigue and anxiety
 Integrated into wristbands
-Pressure sensors in mattresses
+Pressure sensors in sleeping bags
 Monitors: Sleep duration, sleep stages, restlessness, Circadian misalignment
 Using LED technology, the circadian light panel replicates the light spectrum and day-night rhythm of Earth.
 Greenery backgrounds in windows simulating earth like views and sounds

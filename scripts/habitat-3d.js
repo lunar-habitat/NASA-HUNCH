@@ -146,10 +146,10 @@ renderer.outputColorSpace   = THREE.SRGBColorSpace;
 
 const scene  = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0e17);
-scene.fog        = new THREE.FogExp2(0x0a0e17, 0.008);
+scene.fog        = new THREE.FogExp2(0x0a0e17, 0.005);
 
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 500);
-camera.position.set(30, 25, 30);
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 600);
+camera.position.set(45, 35, 45);
 
 /* CSS2D label renderer */
 const labelRenderer = new CSS2DRenderer();
@@ -166,8 +166,8 @@ document.body.appendChild(labelRenderer.domElement);
 const orbitControls = new OrbitControls(camera, renderer.domElement);
 orbitControls.enableDamping  = true;
 orbitControls.dampingFactor  = 0.08;
-orbitControls.minDistance     = 8;
-orbitControls.maxDistance     = 120;
+orbitControls.minDistance     = 10;
+orbitControls.maxDistance     = 180;
 orbitControls.minPolarAngle  = Math.PI * 0.05;
 orbitControls.maxPolarAngle  = Math.PI * 0.48;
 orbitControls.target.set(0, 2, 0);
@@ -617,7 +617,7 @@ function updateCircadianLighting(hour) {
     sunLight.color.copy(colorA).lerp(colorB, t);
 
     // Update scene fog to match ambient
-    const fogDarkness = THREE.MathUtils.lerp(0.012, 0.005, sunLight.intensity);
+    const fogDarkness = THREE.MathUtils.lerp(0.008, 0.003, sunLight.intensity);
     scene.fog.density = fogDarkness;
 }
 
@@ -964,71 +964,71 @@ function updateTimeDisplay() {
 
 const TOUR_WAYPOINTS = [
     {
-        position: [45, 35, 45],
-        target:   [0, 2, 0],
+        position: [55, 40, 55],
+        target:   [0, 3, 0],
         duration: 5,
         title:    'Welcome to the ASCEND Habitat',
         text:     'A modular lunar habitat designed for long-duration crew wellbeing monitoring. At 1/6th Earth gravity, the Moon\'s microgravity environment changes how crew move, sleep, and maintain health — this system tracks those adaptations in real time.'
     },
     {
-        position: [8, 6, 8],
-        target:   [0, 2, 0],
+        position: [12, 8, 12],
+        target:   [0, 3, 0],
         title:    'Central Hub',
         duration: 5,
         text:     'The social heart of the habitat. In lunar microgravity, crew move with a bounding low-g gait — the central anchor post and perimeter handrails help control momentum and stabilise during interaction. The pupilometer monitors pupil dilation and cognitive load in the common area.'
     },
     {
-        position: [18, 5, 3],
-        target:   [14, 2, 0],
+        position: [26, 7, 4],
+        target:   [20, 3, 0],
         duration: 5,
         title:    'Communal Module',
         text:     'Shared dining and recreation space. Handrails along the perimeter help crew navigate the low-gravity environment safely. Doorway motion sensors track social interaction patterns and routine deviations to support group wellbeing.'
     },
     {
-        position: [-18, 5, -3],
-        target:   [-14, 2, 0],
+        position: [-26, 7, -4],
+        target:   [-20, 3, 0],
         duration: 5,
         title:    'Living Quarters',
         text:     'Private berths with sleeping bag pressure sensors. In lunar gravity, crew are anchored in sleeping bags to prevent drifting from low-g movement during sleep. Pressure sensors track sleep duration, stages, restlessness, and circadian alignment throughout each rest cycle.'
     },
     {
-        position: [3, 5, 18],
-        target:   [0, 2, 14],
+        position: [4, 7, 26],
+        target:   [0, 3, 20],
         duration: 5,
         title:    'Research Laboratory',
         text:     'Research workstations with an overhead anchor rail to brace against in low gravity during precision tasks. Pupillometry detects cognitive fatigue, while EDA sensors on the wristband monitor stress levels throughout experiment sessions.'
     },
     {
-        position: [-3, 5, -18],
-        target:   [0, 2, -14],
+        position: [-4, 7, -26],
+        target:   [0, 3, -20],
         duration: 5,
         title:    'Cultivating Bay',
         text:     'Hydroponic gardens provide food and psychological respite. Greenery exposure time, light spectrum, and nature soundscape scores are continuously measured.'
     },
     {
-        position: [15, 5, 14],
-        target:   [10, 2, 10],
+        position: [21, 7, 19],
+        target:   [15, 3, 15],
         duration: 5,
         title:    'Mechanical Systems',
         text:     'Lunar gravity reduces skeletal load to just 1/6th of Earth\'s, accelerating muscle and bone loss without countermeasures. Exercise equipment here targets that risk directly. HRV wristband sensors monitor cardiovascular effort and recovery in real time.'
     },
     {
-        position: [-14, 5, 14],
-        target:   [-10, 2, 10],
+        position: [-21, 7, 19],
+        target:   [-15, 3, 15],
         duration: 5,
         title:    'Airlock & Containment',
         text:     'EVA staging and decontamination area. Doorway motion sensors at the airlock entrance track activity score and flag deviations from safe ingress/egress protocols. Lunar regolith dust is abrasive and toxic — decontamination here protects the pressurised habitat.'
     },
     {
-        position: [0, 12, 30],
-        target:   [0, 2, 0],
+        position: [0, 16, 40],
+        target:   [0, 3, 0],
         duration: 4,
         title:    'Circadian Lighting',
         text:     'Every module shares a unified circadian lighting system. Ceiling fixtures shift from warm dawn tones to cool daylight and dim evening hues, following mission time.'
     },
     {
-        position: [35, 30, 35],
-        target:   [0, 2, 0],
+        position: [50, 40, 50],
+        target:   [0, 3, 0],
         duration: 4,
         title:    'Explore Freely',
         text:     'Tour complete! Click sensors to inspect metrics, swap panels between opaque and window, toggle cutaway mode, or walk through in first-person view.'
@@ -1656,24 +1656,24 @@ function animateInteriors(elapsed) {
    ============================================ */
 
 function animateDoorSensors(elapsed) {
-    // Scan lines sweep up and down inside the frame (0.04 → 2.04m)
+    // Scan lines sweep up and down inside the frame
     const scanLines = state._cached.doorScanLines;
     for (let i = 0, len = scanLines.length; i < len; i++) {
         const sl = scanLines[i];
-        // Offset each frame slightly so they don't all sync
         const phase = i * 0.61;
         const t = (Math.sin(elapsed * 0.9 + phase) + 1) * 0.5; // 0..1
-        sl.position.y = 0.1 + t * 1.9;                          // 0.1 → 2.0 m
-        sl.material.opacity = 0.25 + t * 0.45;
-        sl.material.emissiveIntensity = 0.4 + t * 0.4;
+        const frameH = sl.userData.scanFrameH || 2.8;
+        sl.position.y = 0.1 + t * (frameH - 0.2);
+        sl.material.opacity = 0.3 + t * 0.5;
+        sl.material.emissiveIntensity = 0.5 + t * 0.4;
     }
 
-    // Corner nodes pulse green
+    // Corner and mid-height nodes pulse green
     const nodes = state._cached.doorCornerNodes;
     for (let i = 0, len = nodes.length; i < len; i++) {
         const n = nodes[i];
         const phase = i * 0.9;
-        n.material.emissiveIntensity = 0.4 + Math.sin(elapsed * 2.0 + phase) * 0.35;
+        n.material.emissiveIntensity = 0.5 + Math.sin(elapsed * 2.0 + phase) * 0.4;
     }
 }
 
@@ -2083,9 +2083,9 @@ function updateCircadianFixtures(hour) {
    Rearrange Mode — Drag, Snap, Add, Remove
    ============================================ */
 
-const SLOT_RADIUS = 14;      // Distance from hub center
+const SLOT_RADIUS = 20;      // Distance from hub center
 const SLOT_COUNT  = 8;       // Max peripheral slots
-const MIN_MODULE_DIST = 9;   // Minimum distance between module centers
+const MIN_MODULE_DIST = 13;  // Minimum distance between module centers
 
 let isDragging = false;
 const dragOffset = new THREE.Vector3();
@@ -2436,7 +2436,7 @@ function updateMinimap() {
     ctx.fillStyle = 'rgba(10, 14, 23, 0.9)';
     ctx.fillRect(0, 0, w, h);
 
-    const scale = 2.2;
+    const scale = 1.5;
     const cx = w / 2;
     const cy = h / 2;
 
