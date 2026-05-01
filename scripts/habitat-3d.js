@@ -12,7 +12,7 @@ import { RenderPass }         from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass }    from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 import { SCENARIOS, getCurrentSample, generateSeries, computeWellbeingIndex, computeStatus } from './data.js';
-import { buildHabitat, MODULE_TYPES, DEFAULT_LAYOUT, rebuildHabitat } from './habitat-geometry.js';
+import { buildHabitat, MODULE_TYPES, DEFAULT_LAYOUT, rebuildHabitat, CORRIDOR_RADIUS } from './habitat-geometry.js';
 import { furnishModule } from './habitat-interiors.js';
 import { icon } from './icons.js';
 
@@ -1189,7 +1189,7 @@ function applyPanelPreset(preset) {
         if (child.userData.isOuterPanel && child.userData.swappable) {
             switch (preset) {
                 case 'opaque':
-                    child.material.color.set(0x8a8a8a);
+                    child.material.color.set(0xf0f0f0);
                     child.material.transmission = 0;
                     child.material.opacity = 1.0;
                     child.userData.defaultOpacity = 1.0;
@@ -1205,7 +1205,7 @@ function applyPanelPreset(preset) {
                 case 'mixed':
                     // Restore original
                     const isWindow = child.userData.originalPanelType === 'window';
-                    child.material.color.set(isWindow ? 0x88ccff : 0x8a8a8a);
+                    child.material.color.set(isWindow ? 0x88ccff : 0xf0f0f0);
                     child.material.transmission = isWindow ? 0.6 : 0;
                     child.material.opacity = isWindow ? 0.3 : 1.0;
                     child.userData.defaultOpacity = isWindow ? 0.3 : 1.0;
@@ -2403,6 +2403,45 @@ function initFirstPersonKeys() {
     });
 }
 
+const FP_PLAYER_RADIUS = 0.35;
+
+/**
+ * Check if a horizontal point (x, z) is inside the walkable habitat volume:
+ * inside any module dome OR inside any corridor capsule. Uses a player-radius
+ * buffer so the camera never clips through walls.
+ */
+function isWalkablePosition(x, z) {
+    const buf = FP_PLAYER_RADIUS;
+
+    // Module dome disks
+    for (const mod of state.layout) {
+        const info = MODULE_TYPES[mod.type];
+        if (!info) continue;
+        const dx = x - mod.position[0];
+        const dz = z - mod.position[2];
+        if (Math.sqrt(dx * dx + dz * dz) + buf <= info.radius) return true;
+    }
+
+    // Corridor capsules — hub (index 0) to each other module
+    if (state.layout.length > 1) {
+        const hub = state.layout[0];
+        const ax = hub.position[0], az = hub.position[2];
+        for (let i = 1; i < state.layout.length; i++) {
+            const m = state.layout[i];
+            const bx = m.position[0], bz = m.position[2];
+            const sx = bx - ax, sz = bz - az;
+            const len2 = sx * sx + sz * sz;
+            if (len2 < 0.001) continue;
+            let t = ((x - ax) * sx + (z - az) * sz) / len2;
+            if (t < 0 || t > 1) continue;
+            const px = ax + t * sx, pz = az + t * sz;
+            const dx = x - px, dz = z - pz;
+            if (Math.sqrt(dx * dx + dz * dz) + buf <= CORRIDOR_RADIUS) return true;
+        }
+    }
+    return false;
+}
+
 function updateFirstPerson(delta) {
     if (state.viewMode !== 'firstperson' || !fpControls.isLocked) return;
 
@@ -2415,8 +2454,25 @@ function updateFirstPerson(delta) {
     if (fpKeys.right)    dir.x += 1;
     dir.normalize();
 
+    const oldX = camera.position.x;
+    const oldZ = camera.position.z;
+
     fpControls.moveRight(dir.x * speed);
     fpControls.moveForward(-dir.z * speed);
+
+    // Wall collision: try full move, else slide along one axis, else block.
+    const newX = camera.position.x;
+    const newZ = camera.position.z;
+    if (!isWalkablePosition(newX, newZ)) {
+        if (isWalkablePosition(newX, oldZ)) {
+            camera.position.z = oldZ;
+        } else if (isWalkablePosition(oldX, newZ)) {
+            camera.position.x = oldX;
+        } else {
+            camera.position.x = oldX;
+            camera.position.z = oldZ;
+        }
+    }
 
     // Clamp to terrain
     camera.position.y = 1.85;
