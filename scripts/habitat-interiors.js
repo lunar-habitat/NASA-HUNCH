@@ -180,13 +180,15 @@ export function furnishModule(moduleGroup, moduleType) {
         }
     });
 
-    // Soft warm circadian-responsive point light (no visible mesh)
+    // Soft warm circadian-responsive point light (no visible mesh) — its
+    // color and intensity shift with the time slider via updateCircadianFixtures.
     const ceilingLight = new THREE.PointLight(0xffeedd, 0.7, radius * 2.5);
     ceilingLight.position.set(0, radius * 0.65, 0);
     ceilingLight.userData.isCircadianLight = true;
+    ceilingLight.userData.baseIntensityFactor = 1.0; // multiplier on the global circadian intensity
     moduleGroup.add(ceilingLight);
 
-    // Subtle floor cove ring for wayfinding
+    // Subtle floor cove ring for wayfinding (kept as a static blue accent)
     const cove = new THREE.Mesh(
         new THREE.TorusGeometry(radius * 0.92, 0.022, 4, 32),
         new THREE.MeshStandardMaterial({
@@ -198,6 +200,7 @@ export function furnishModule(moduleGroup, moduleType) {
     cove.position.y = 0.04;
     cove.userData.isCoveStrip = true;
     moduleGroup.add(cove);
+
 
     // Sensor hotspots — small, at low height so they're not visible from outside above
     const sensors = MODULE_SENSORS[moduleType] || [];

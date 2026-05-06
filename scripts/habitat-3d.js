@@ -112,7 +112,7 @@ const state = {
     // Remove module mode
     removeMode: false,
     // Cached references for per-frame animation (avoids scene traversal)
-    _cached: { hotspots: [], holoRings: [], growLights: [], screens: [], particles: [], circadianFixtures: [], toggleAnims: [], doorScanLines: [], doorCornerNodes: [] }
+    _cached: { hotspots: [], holoRings: [], growLights: [], screens: [], particles: [], circadianFixtures: [], circadianLights: [], toggleAnims: [], doorScanLines: [], doorCornerNodes: [], slidingDoors: [], motionSensors: [], doorAssemblies: [], doorwayLEDs: [], animatedViewPanels: [] }
 };
 
 /* ============================================
@@ -1332,10 +1332,27 @@ function clearHighlight() {
    Raycasting / Click Interactions
    ============================================ */
 
+const VIEW_CYCLE = ['regular', 'earth', 'forest', 'ocean', 'mountain', 'aurora', 'opaque'];
+
+function cyclePanelView(panel) {
+    const current = panel.userData.viewOption
+        ?? (panel.userData.panelType === 'window' ? 'regular' : 'opaque');
+    const idx = VIEW_CYCLE.indexOf(current);
+    const next = VIEW_CYCLE[(idx + 1) % VIEW_CYCLE.length];
+    applyViewToPanel(panel, next);
+}
+
 function onCanvasClick(event) {
     const rect = canvas.getBoundingClientRect();
-    state.mouse.x =  ((event.clientX - rect.left) / rect.width)  * 2 - 1;
-    state.mouse.y = -((event.clientY - rect.top)  / rect.height) * 2 + 1;
+    const fpClick = state.viewMode === 'firstperson' && fpControls.isLocked;
+    if (fpClick) {
+        // Pointer is locked — raycast from screen center (where the camera looks).
+        state.mouse.x = 0;
+        state.mouse.y = 0;
+    } else {
+        state.mouse.x =  ((event.clientX - rect.left) / rect.width)  * 2 - 1;
+        state.mouse.y = -((event.clientY - rect.top)  / rect.height) * 2 + 1;
+    }
 
     state.raycaster.setFromCamera(state.mouse, camera);
 
@@ -1345,10 +1362,18 @@ function onCanvasClick(event) {
     for (const hit of intersects) {
         const obj = hit.object;
 
-        // Panel swap on click
-        if (obj.userData.isOuterPanel && obj.userData.swappable && state.panelPreset === 'mixed') {
-            togglePanel(obj, event.clientX, event.clientY);
-            return;
+        if (obj.userData.isOuterPanel && obj.userData.swappable) {
+            // First-person: cycle through the procedural window views in place
+            // (no popup — pointer is locked and a popup couldn't be clicked).
+            if (fpClick) {
+                cyclePanelView(obj);
+                return;
+            }
+            // Overview / mixed preset: open the popup picker as before.
+            if (state.panelPreset === 'mixed') {
+                togglePanel(obj, event.clientX, event.clientY);
+                return;
+            }
         }
 
         // Sensor / system hotspot
@@ -1601,8 +1626,15 @@ function cacheAnimatedObjects() {
     c.toggleAnims = [];
     c.doorScanLines = [];
     c.doorCornerNodes = [];
+    c.slidingDoors = [];
+    c.motionSensors = [];
+    c.doorAssemblies = [];
+    c.doorwayLEDs = [];
+    c.circadianLights = [];
 
     if (!state.habitatGroup) return;
+    // Make sure world matrices are up to date so we can resolve sensor world positions
+    state.habitatGroup.updateMatrixWorld(true);
     state.habitatGroup.traverse(child => {
         if (child.userData.isHotspot && child.material) c.hotspots.push(child);
         if (child.userData.isHologramRing) c.holoRings.push(child);
@@ -1612,6 +1644,21 @@ function cacheAnimatedObjects() {
         if (child.userData.isCircadianFixture && child.material) c.circadianFixtures.push(child);
         if (child.userData.isDoorScanLine && child.material) c.doorScanLines.push(child);
         if (child.userData.isDoorCornerNode && child.material) c.doorCornerNodes.push(child);
+        if (child.userData.isSlidingDoor) c.slidingDoors.push(child);
+        if (child.userData.isMotionSensor) {
+            child.getWorldPosition(child.userData.worldPos);
+            c.motionSensors.push(child);
+        }
+        if (child.userData.isDoorwayAssembly) {
+            // Cache flat XZ position for fast distance/axial checks each frame.
+            const wp = new THREE.Vector3();
+            child.getWorldPosition(wp);
+            child.userData.worldX = wp.x;
+            child.userData.worldZ = wp.z;
+            c.doorAssemblies.push(child);
+        }
+        if (child.userData.isDoorwayLED && child.material) c.doorwayLEDs.push(child);
+        if (child.userData.isCircadianLight && child.isLight) c.circadianLights.push(child);
     });
 }
 
@@ -1686,221 +1733,435 @@ function animateDoorSensors(elapsed) {
    ============================================ */
 
 const VIEW_OPTIONS = {
-    earth:    { label: 'Earth',    audio: null,                                    generate: generateEarthTexture },
-    forest:   { label: 'Forest',   audio: '../assets/audio/forest-loop.mp3',       generate: generateForestTexture },
-    ocean:    { label: 'Ocean',    audio: '../assets/audio/ocean-loop.mp3',         generate: generateOceanTexture },
-    mountain: { label: 'Mountain', audio: '../assets/audio/the_mountain-space-438391.mp3', generate: generateMountainTexture },
-    aurora:   { label: 'Aurora',   audio: '../assets/audio/aurora-loop.mp3',        generate: generateAuroraTexture }
+    earth:    { label: 'Earth',    audio: null,                                    make: makeEarthAnimator },
+    forest:   { label: 'Forest',   audio: '../assets/audio/forest-loop.mp3',       make: makeForestAnimator },
+    ocean:    { label: 'Ocean',    audio: '../assets/audio/ocean-loop.mp3',         make: makeOceanAnimator },
+    mountain: { label: 'Mountain', audio: '../assets/audio/the_mountain-space-438391.mp3', make: makeMountainAnimator },
+    aurora:   { label: 'Aurora',   audio: '../assets/audio/aurora-loop.mp3',        make: makeAuroraAnimator }
 };
 
-const _viewTextures = {};
+/* Map: viewId → { texture, draw(time) }. Each canvas-backed texture is
+   shared across all panels showing the same view; one update per tick
+   (throttled in updateAnimatedViews) propagates to every panel. */
+const _viewAnimators = {};
 
 function getViewTexture(viewId) {
-    if (_viewTextures[viewId]) return _viewTextures[viewId];
-    const tex = VIEW_OPTIONS[viewId]?.generate();
-    if (tex) _viewTextures[viewId] = tex;
-    return tex || null;
+    if (_viewAnimators[viewId]) return _viewAnimators[viewId].texture;
+    const make = VIEW_OPTIONS[viewId]?.make;
+    if (!make) return null;
+    const animator = make();
+    _viewAnimators[viewId] = animator;
+    return animator.texture;
 }
 
-function generateEarthTexture() {
-    const size = 128;
+let _lastViewAnimUpdate = 0;
+function updateAnimatedViews(elapsed) {
+    if (elapsed - _lastViewAnimUpdate < 0.1) return; // ~10 Hz
+    _lastViewAnimUpdate = elapsed;
+    for (const id in _viewAnimators) {
+        _viewAnimators[id].draw(elapsed);
+    }
+}
+
+/* Each animator pre-seeds deterministic positions for stars/clouds (so they
+   stay in place between frames) and re-draws the canvas each tick with
+   time-varying alpha, offsets, and gradients to create gentle motion. */
+
+function _makeAnimatorBase(size = 128) {
     const canvas = document.createElement('canvas');
-    canvas.width = size; canvas.height = size;
+    canvas.width = canvas.height = size;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#050510'; ctx.fillRect(0, 0, size, size);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
+    return { size, canvas, ctx, texture };
+}
+
+/* Deterministic pseudo-random in [0, 1). */
+function _hashRand(i, salt = 1) {
+    const x = Math.sin(i * 12.9898 + salt * 78.233) * 43758.5453;
+    return x - Math.floor(x);
+}
+
+function makeEarthAnimator() {
+    const { size, ctx, texture } = _makeAnimatorBase();
     const cx = size * 0.5, cy = size * 0.55, r = size * 0.3;
-    const g = ctx.createRadialGradient(cx - r * 0.2, cy - r * 0.2, r * 0.1, cx, cy, r);
-    g.addColorStop(0, '#88ccff'); g.addColorStop(0.4, '#2277bb');
-    g.addColorStop(0.7, '#115588'); g.addColorStop(1, '#051530');
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
-    ctx.fillStyle = 'rgba(50,140,70,0.6)';
-    ctx.beginPath(); ctx.ellipse(cx - r*0.2, cy - r*0.1, r*0.25, r*0.15, -0.3, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx + r*0.3, cy + r*0.2, r*0.2,  r*0.3,  0.2,  0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx - r*0.4, cy + r*0.4, r*0.15, r*0.1,  0.5,  0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx, cy, r + 2, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(100,180,255,0.3)'; ctx.lineWidth = 3; ctx.stroke();
+
+    const stars = [];
     for (let i = 0; i < 30; i++) {
-        const sx = Math.random() * size, sy = Math.random() * size;
+        const sx = _hashRand(i, 1) * size;
+        const sy = _hashRand(i, 2) * size;
         if (Math.hypot(sx - cx, sy - cy) < r + 5) continue;
-        ctx.fillStyle = `rgba(255,255,255,${0.3 + Math.random() * 0.5})`;
-        ctx.fillRect(sx, sy, 1, 1);
+        stars.push({ x: sx, y: sy, baseAlpha: 0.3 + _hashRand(i, 3) * 0.5, phase: _hashRand(i, 4) * Math.PI * 2 });
     }
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-    return tex;
+    const clouds = [];
+    for (let i = 0; i < 7; i++) {
+        clouds.push({
+            angle: _hashRand(i, 5) * Math.PI * 2,
+            radial: 0.45 + _hashRand(i, 6) * 0.45,
+            sz: 0.14 + _hashRand(i, 7) * 0.12
+        });
+    }
+
+    function draw(t) {
+        ctx.fillStyle = '#050510'; ctx.fillRect(0, 0, size, size);
+        for (let i = 0; i < stars.length; i++) {
+            const s = stars[i];
+            const a = Math.max(0.05, s.baseAlpha + Math.sin(t * 1.6 + s.phase) * 0.25);
+            ctx.fillStyle = `rgba(255,255,255,${a})`;
+            ctx.fillRect(s.x, s.y, 1, 1);
+        }
+        const g = ctx.createRadialGradient(cx - r * 0.2, cy - r * 0.2, r * 0.1, cx, cy, r);
+        g.addColorStop(0, '#88ccff'); g.addColorStop(0.4, '#2277bb');
+        g.addColorStop(0.7, '#115588'); g.addColorStop(1, '#051530');
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+
+        ctx.fillStyle = 'rgba(50,140,70,0.6)';
+        ctx.beginPath(); ctx.ellipse(cx - r*0.2, cy - r*0.1, r*0.25, r*0.15, -0.3, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(cx + r*0.3, cy + r*0.2, r*0.2,  r*0.3,  0.2,  0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(cx - r*0.4, cy + r*0.4, r*0.15, r*0.1,  0.5,  0, Math.PI*2); ctx.fill();
+
+        // Drifting cloud overlay, clipped to disk
+        ctx.save();
+        ctx.beginPath(); ctx.arc(cx, cy, r - 1, 0, Math.PI * 2); ctx.clip();
+        const rot = t * 0.08;
+        ctx.fillStyle = 'rgba(255,255,255,0.32)';
+        for (let i = 0; i < clouds.length; i++) {
+            const c = clouds[i];
+            const a = c.angle + rot;
+            const ex = cx + Math.cos(a) * r * c.radial;
+            const ey = cy + Math.sin(a) * r * c.radial * 0.55;
+            ctx.beginPath();
+            ctx.ellipse(ex, ey, r * c.sz, r * c.sz * 0.5, a, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+
+        // Atmospheric ring (subtle breathe)
+        const ringA = 0.25 + Math.sin(t * 0.4) * 0.08;
+        ctx.beginPath(); ctx.arc(cx, cy, r + 2, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(100,180,255,${ringA})`; ctx.lineWidth = 3; ctx.stroke();
+
+        texture.needsUpdate = true;
+    }
+    draw(0);
+    return { texture, draw };
 }
 
-function generateForestTexture() {
-    const size = 128;
-    const canvas = document.createElement('canvas');
-    canvas.width = size; canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    // Night sky gradient
-    const sky = ctx.createLinearGradient(0, 0, 0, size);
-    sky.addColorStop(0, '#05080f'); sky.addColorStop(1, '#0d1a10');
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, size, size);
-    // Moon
-    ctx.beginPath(); ctx.arc(size * 0.75, size * 0.18, 8, 0, Math.PI * 2);
-    ctx.fillStyle = '#d4d8c8'; ctx.fill();
-    // Stars
+function makeForestAnimator() {
+    const { size, ctx, texture } = _makeAnimatorBase();
+
+    const stars = [];
     for (let i = 0; i < 40; i++) {
-        ctx.fillStyle = `rgba(255,255,255,${0.2 + Math.random() * 0.6})`;
-        ctx.fillRect(Math.random() * size, Math.random() * size * 0.55, 1, 1);
+        stars.push({
+            x: _hashRand(i, 11) * size,
+            y: _hashRand(i, 12) * size * 0.55,
+            baseAlpha: 0.2 + _hashRand(i, 13) * 0.6,
+            phase: _hashRand(i, 14) * Math.PI * 2
+        });
     }
-    // Tree silhouettes
-    ctx.fillStyle = '#051508';
-    for (let t = 0; t < 14; t++) {
-        const tx = (t / 13) * size + Math.sin(t) * 4;
-        const th = 18 + Math.sin(t * 2.3) * 8;
-        ctx.beginPath();
-        ctx.moveTo(tx, size); ctx.lineTo(tx - 6, size - th * 0.5);
-        ctx.lineTo(tx - 4, size - th * 0.5); ctx.lineTo(tx - 3, size - th * 0.7);
-        ctx.lineTo(tx - 2, size - th * 0.7); ctx.lineTo(tx, size - th);
-        ctx.lineTo(tx + 2, size - th * 0.7); ctx.lineTo(tx + 3, size - th * 0.7);
-        ctx.lineTo(tx + 4, size - th * 0.5); ctx.lineTo(tx + 6, size - th * 0.5);
-        ctx.closePath(); ctx.fill();
+
+    function draw(t) {
+        const sky = ctx.createLinearGradient(0, 0, 0, size);
+        sky.addColorStop(0, '#05080f'); sky.addColorStop(1, '#0d1a10');
+        ctx.fillStyle = sky; ctx.fillRect(0, 0, size, size);
+
+        // Moon
+        ctx.beginPath(); ctx.arc(size * 0.75, size * 0.18, 8, 0, Math.PI * 2);
+        ctx.fillStyle = '#d4d8c8'; ctx.fill();
+
+        // Twinkling stars
+        for (let i = 0; i < stars.length; i++) {
+            const s = stars[i];
+            const a = Math.max(0.05, s.baseAlpha + Math.sin(t * 1.8 + s.phase) * 0.3);
+            ctx.fillStyle = `rgba(255,255,255,${a})`;
+            ctx.fillRect(s.x, s.y, 1, 1);
+        }
+
+        // Tree silhouettes (static)
+        ctx.fillStyle = '#051508';
+        for (let i = 0; i < 14; i++) {
+            const tx = (i / 13) * size + Math.sin(i) * 4;
+            const th = 18 + Math.sin(i * 2.3) * 8;
+            ctx.beginPath();
+            ctx.moveTo(tx, size); ctx.lineTo(tx - 6, size - th * 0.5);
+            ctx.lineTo(tx - 4, size - th * 0.5); ctx.lineTo(tx - 3, size - th * 0.7);
+            ctx.lineTo(tx - 2, size - th * 0.7); ctx.lineTo(tx, size - th);
+            ctx.lineTo(tx + 2, size - th * 0.7); ctx.lineTo(tx + 3, size - th * 0.7);
+            ctx.lineTo(tx + 4, size - th * 0.5); ctx.lineTo(tx + 6, size - th * 0.5);
+            ctx.closePath(); ctx.fill();
+        }
+
+        // Drifting ground mist — horizontal scroll
+        const mistOff = (t * 8) % size;
+        for (let pass = 0; pass < 2; pass++) {
+            const mist = ctx.createLinearGradient(0, size * 0.8, 0, size);
+            const breathe = 0.12 + Math.sin(t * 0.5 + pass) * 0.05;
+            mist.addColorStop(0, 'rgba(140,200,140,0)');
+            mist.addColorStop(1, `rgba(140,200,140,${breathe})`);
+            ctx.fillStyle = mist;
+            const xOff = pass === 0 ? -mistOff : size - mistOff;
+            ctx.fillRect(xOff, size * 0.8, size, size * 0.2);
+        }
+
+        texture.needsUpdate = true;
     }
-    // Ground mist
-    const mist = ctx.createLinearGradient(0, size * 0.8, 0, size);
-    mist.addColorStop(0, 'rgba(140,200,140,0)'); mist.addColorStop(1, 'rgba(140,200,140,0.15)');
-    ctx.fillStyle = mist; ctx.fillRect(0, size * 0.8, size, size * 0.2);
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-    return tex;
+    draw(0);
+    return { texture, draw };
 }
 
-function generateOceanTexture() {
-    const size = 128;
-    const canvas = document.createElement('canvas');
-    canvas.width = size; canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    // Sky-to-ocean gradient
-    const bg = ctx.createLinearGradient(0, 0, 0, size);
-    bg.addColorStop(0, '#0a1a2e'); bg.addColorStop(0.4, '#1a3a5c'); bg.addColorStop(1, '#0d2a40');
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, size, size);
-    // Horizon glow
-    const hor = ctx.createLinearGradient(0, size * 0.38, 0, size * 0.5);
-    hor.addColorStop(0, 'rgba(255,180,80,0.18)'); hor.addColorStop(1, 'rgba(255,180,80,0)');
-    ctx.fillStyle = hor; ctx.fillRect(0, size * 0.38, size, size * 0.12);
-    // Stars
+function makeOceanAnimator() {
+    const { size, ctx, texture } = _makeAnimatorBase();
+
+    const stars = [];
     for (let i = 0; i < 25; i++) {
-        ctx.fillStyle = `rgba(255,255,255,${0.2 + Math.random() * 0.5})`;
-        ctx.fillRect(Math.random() * size, Math.random() * size * 0.35, 1, 1);
+        stars.push({
+            x: _hashRand(i, 21) * size,
+            y: _hashRand(i, 22) * size * 0.35,
+            baseAlpha: 0.2 + _hashRand(i, 23) * 0.5,
+            phase: _hashRand(i, 24) * Math.PI * 2
+        });
     }
-    // Wave arcs
-    ctx.strokeStyle = 'rgba(120,200,255,0.3)'; ctx.lineWidth = 1;
-    for (let w = 0; w < 8; w++) {
-        const wy = size * 0.5 + w * (size * 0.065);
-        ctx.beginPath();
-        for (let x = 0; x <= size; x += 4) {
-            const y = wy + Math.sin((x / size) * Math.PI * 4 + w * 0.8) * 2;
-            x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-    }
-    // Caustic sparkles
+    const sparkles = [];
     for (let i = 0; i < 20; i++) {
-        ctx.fillStyle = `rgba(200,240,255,${0.2 + Math.random() * 0.3})`;
-        ctx.beginPath();
-        ctx.arc(Math.random() * size, size * 0.5 + Math.random() * size * 0.5, 1, 0, Math.PI * 2);
-        ctx.fill();
+        sparkles.push({
+            x: _hashRand(i, 31) * size,
+            y: size * 0.5 + _hashRand(i, 32) * size * 0.5,
+            phase: _hashRand(i, 33) * Math.PI * 2
+        });
     }
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-    return tex;
+
+    function draw(t) {
+        const bg = ctx.createLinearGradient(0, 0, 0, size);
+        bg.addColorStop(0, '#0a1a2e'); bg.addColorStop(0.4, '#1a3a5c'); bg.addColorStop(1, '#0d2a40');
+        ctx.fillStyle = bg; ctx.fillRect(0, 0, size, size);
+
+        const hor = ctx.createLinearGradient(0, size * 0.38, 0, size * 0.5);
+        hor.addColorStop(0, 'rgba(255,180,80,0.18)'); hor.addColorStop(1, 'rgba(255,180,80,0)');
+        ctx.fillStyle = hor; ctx.fillRect(0, size * 0.38, size, size * 0.12);
+
+        for (let i = 0; i < stars.length; i++) {
+            const s = stars[i];
+            const a = Math.max(0.05, s.baseAlpha + Math.sin(t * 2.0 + s.phase) * 0.25);
+            ctx.fillStyle = `rgba(255,255,255,${a})`;
+            ctx.fillRect(s.x, s.y, 1, 1);
+        }
+
+        // Wave arcs scrolling horizontally
+        ctx.strokeStyle = 'rgba(120,200,255,0.3)'; ctx.lineWidth = 1;
+        for (let w = 0; w < 8; w++) {
+            const wy = size * 0.5 + w * (size * 0.065);
+            const phase = t * 0.6 + w * 0.8;
+            ctx.beginPath();
+            for (let x = 0; x <= size; x += 4) {
+                const y = wy + Math.sin((x / size) * Math.PI * 4 + phase) * 2;
+                x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+
+        // Caustic sparkles fade in/out
+        for (let i = 0; i < sparkles.length; i++) {
+            const sp = sparkles[i];
+            const a = Math.max(0, 0.35 + Math.sin(t * 2.5 + sp.phase) * 0.35);
+            ctx.fillStyle = `rgba(200,240,255,${a})`;
+            ctx.beginPath(); ctx.arc(sp.x, sp.y, 1, 0, Math.PI * 2); ctx.fill();
+        }
+
+        texture.needsUpdate = true;
+    }
+    draw(0);
+    return { texture, draw };
 }
 
-function generateMountainTexture() {
-    const size = 128;
-    const canvas = document.createElement('canvas');
-    canvas.width = size; canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    // Deep purple sky
-    const sky = ctx.createLinearGradient(0, 0, 0, size);
-    sky.addColorStop(0, '#080414'); sky.addColorStop(0.6, '#1a0a30'); sky.addColorStop(1, '#0a0814');
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, size, size);
-    // Dense stars
+function makeMountainAnimator() {
+    const { size, ctx, texture } = _makeAnimatorBase();
+
+    const stars = [];
     for (let i = 0; i < 60; i++) {
-        ctx.fillStyle = `rgba(255,255,255,${0.2 + Math.random() * 0.7})`;
-        ctx.fillRect(Math.random() * size, Math.random() * size * 0.65, Math.random() < 0.15 ? 2 : 1, Math.random() < 0.15 ? 2 : 1);
+        const big = _hashRand(i, 41) < 0.15;
+        stars.push({
+            x: _hashRand(i, 42) * size,
+            y: _hashRand(i, 43) * size * 0.65,
+            big,
+            baseAlpha: 0.2 + _hashRand(i, 44) * 0.7,
+            phase: _hashRand(i, 45) * Math.PI * 2
+        });
     }
-    // Distant planet arc (upper right)
-    ctx.beginPath(); ctx.arc(size * 0.82, size * 0.15, 12, 0, Math.PI * 2);
-    const pg = ctx.createRadialGradient(size * 0.78, size * 0.11, 1, size * 0.82, size * 0.15, 12);
-    pg.addColorStop(0, '#c8a060'); pg.addColorStop(1, '#60380a');
-    ctx.fillStyle = pg; ctx.fill();
-    // Far ridge (dark)
-    ctx.fillStyle = '#100818';
-    ctx.beginPath(); ctx.moveTo(0, size * 0.72);
-    for (let x = 0; x <= size; x += 8) {
-        ctx.lineTo(x, size * 0.72 - Math.abs(Math.sin(x * 0.07) * 14 + Math.sin(x * 0.19) * 7));
+
+    function draw(t) {
+        const sky = ctx.createLinearGradient(0, 0, 0, size);
+        sky.addColorStop(0, '#080414'); sky.addColorStop(0.6, '#1a0a30'); sky.addColorStop(1, '#0a0814');
+        ctx.fillStyle = sky; ctx.fillRect(0, 0, size, size);
+
+        for (let i = 0; i < stars.length; i++) {
+            const s = stars[i];
+            const a = Math.max(0.05, s.baseAlpha + Math.sin(t * 1.4 + s.phase) * 0.3);
+            ctx.fillStyle = `rgba(255,255,255,${a})`;
+            const sz = s.big ? 2 : 1;
+            ctx.fillRect(s.x, s.y, sz, sz);
+        }
+
+        // Distant planet
+        ctx.beginPath(); ctx.arc(size * 0.82, size * 0.15, 12, 0, Math.PI * 2);
+        const pg = ctx.createRadialGradient(size * 0.78, size * 0.11, 1, size * 0.82, size * 0.15, 12);
+        pg.addColorStop(0, '#c8a060'); pg.addColorStop(1, '#60380a');
+        ctx.fillStyle = pg; ctx.fill();
+
+        // Far ridge
+        ctx.fillStyle = '#100818';
+        ctx.beginPath(); ctx.moveTo(0, size * 0.72);
+        for (let x = 0; x <= size; x += 8) {
+            ctx.lineTo(x, size * 0.72 - Math.abs(Math.sin(x * 0.07) * 14 + Math.sin(x * 0.19) * 7));
+        }
+        ctx.lineTo(size, size); ctx.lineTo(0, size); ctx.closePath(); ctx.fill();
+
+        // Near ridge
+        ctx.fillStyle = '#040208';
+        ctx.beginPath(); ctx.moveTo(0, size * 0.85);
+        for (let x = 0; x <= size; x += 6) {
+            ctx.lineTo(x, size * 0.85 - Math.abs(Math.sin(x * 0.05 + 1) * 22 + Math.sin(x * 0.13) * 10));
+        }
+        ctx.lineTo(size, size); ctx.lineTo(0, size); ctx.closePath(); ctx.fill();
+
+        ctx.fillStyle = 'rgba(220,230,240,0.65)';
+        for (let p = 10; p < size - 10; p += 18) {
+            const py = size * 0.85 - Math.abs(Math.sin(p * 0.05 + 1) * 22 + Math.sin(p * 0.13) * 10);
+            ctx.beginPath(); ctx.ellipse(p, py + 3, 4, 3, 0, 0, Math.PI * 2); ctx.fill();
+        }
+
+        texture.needsUpdate = true;
     }
-    ctx.lineTo(size, size); ctx.lineTo(0, size); ctx.closePath(); ctx.fill();
-    // Near ridge (black silhouette)
-    ctx.fillStyle = '#040208';
-    ctx.beginPath(); ctx.moveTo(0, size * 0.85);
-    for (let x = 0; x <= size; x += 6) {
-        ctx.lineTo(x, size * 0.85 - Math.abs(Math.sin(x * 0.05 + 1) * 22 + Math.sin(x * 0.13) * 10));
-    }
-    ctx.lineTo(size, size); ctx.lineTo(0, size); ctx.closePath(); ctx.fill();
-    // Snow caps
-    ctx.fillStyle = 'rgba(220,230,240,0.65)';
-    for (let p = 10; p < size - 10; p += 18) {
-        const py = size * 0.85 - Math.abs(Math.sin(p * 0.05 + 1) * 22 + Math.sin(p * 0.13) * 10);
-        ctx.beginPath(); ctx.ellipse(p, py + 3, 4, 3, 0, 0, Math.PI * 2); ctx.fill();
-    }
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-    return tex;
+    draw(0);
+    return { texture, draw };
 }
 
-function generateAuroraTexture() {
-    const size = 128;
-    const canvas = document.createElement('canvas');
-    canvas.width = size; canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    // Near-black sky
-    ctx.fillStyle = '#020608'; ctx.fillRect(0, 0, size, size);
-    // Aurora bands — teal, green, violet
+function makeAuroraAnimator() {
+    const { size, ctx, texture } = _makeAnimatorBase();
+
     const bands = [
-        { color0: 'rgba(0,220,180,0)',  color1: 'rgba(0,220,180,0.35)', y0: 0.15, y1: 0.45 },
-        { color0: 'rgba(40,255,120,0)', color1: 'rgba(40,255,120,0.2)',  y0: 0.25, y1: 0.6  },
-        { color0: 'rgba(160,60,255,0)', color1: 'rgba(160,60,255,0.2)',  y0: 0.1,  y1: 0.5  }
+        { rgb: '0,220,180', alpha: 0.35, y0: 0.15, y1: 0.45, phase: 0,    yAmp: 0.05 },
+        { rgb: '40,255,120', alpha: 0.20, y0: 0.25, y1: 0.60, phase: 1.7, yAmp: 0.06 },
+        { rgb: '160,60,255', alpha: 0.20, y0: 0.10, y1: 0.50, phase: 3.4, yAmp: 0.04 }
     ];
-    for (const band of bands) {
-        const gr = ctx.createLinearGradient(0, size * band.y0, 0, size * band.y1);
-        gr.addColorStop(0, band.color0); gr.addColorStop(0.5, band.color1); gr.addColorStop(1, band.color0);
-        ctx.fillStyle = gr;
-        // Wavy band using clip path
-        ctx.beginPath();
-        for (let x = 0; x <= size; x += 2) {
-            const yOff = Math.sin(x * 0.08 + band.y0 * 10) * size * 0.04;
-            const y = size * band.y0 + yOff;
-            x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-        }
-        for (let x = size; x >= 0; x -= 2) {
-            const yOff = Math.sin(x * 0.08 + band.y0 * 10) * size * 0.04;
-            const y = size * band.y1 + yOff;
-            ctx.lineTo(x, y);
-        }
-        ctx.closePath(); ctx.fill();
-    }
-    // Sharp stars
+    const stars = [];
     for (let i = 0; i < 50; i++) {
-        ctx.fillStyle = `rgba(255,255,255,${0.4 + Math.random() * 0.6})`;
-        ctx.fillRect(Math.random() * size, Math.random() * size * 0.85, 1, 1);
+        stars.push({
+            x: _hashRand(i, 51) * size,
+            y: _hashRand(i, 52) * size * 0.85,
+            baseAlpha: 0.4 + _hashRand(i, 53) * 0.6,
+            phase: _hashRand(i, 54) * Math.PI * 2
+        });
     }
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-    return tex;
+
+    function draw(t) {
+        ctx.fillStyle = '#020608'; ctx.fillRect(0, 0, size, size);
+
+        for (const band of bands) {
+            const breathe = Math.sin(t * 0.6 + band.phase) * 0.4 + 1.0; // 0.6..1.4
+            const yShift = Math.sin(t * 0.4 + band.phase) * size * band.yAmp;
+            const y0 = size * band.y0 + yShift;
+            const y1 = size * band.y1 + yShift;
+            const a1 = `rgba(${band.rgb},${band.alpha * breathe})`;
+            const a0 = `rgba(${band.rgb},0)`;
+            const gr = ctx.createLinearGradient(0, y0, 0, y1);
+            gr.addColorStop(0, a0); gr.addColorStop(0.5, a1); gr.addColorStop(1, a0);
+            ctx.fillStyle = gr;
+            ctx.beginPath();
+            for (let x = 0; x <= size; x += 2) {
+                const yOff = Math.sin(x * 0.08 + band.phase + t * 0.3) * size * 0.04;
+                ctx.lineTo(x, y0 + yOff);
+            }
+            for (let x = size; x >= 0; x -= 2) {
+                const yOff = Math.sin(x * 0.08 + band.phase + t * 0.3) * size * 0.04;
+                ctx.lineTo(x, y1 + yOff);
+            }
+            ctx.closePath(); ctx.fill();
+        }
+
+        for (let i = 0; i < stars.length; i++) {
+            const s = stars[i];
+            const a = Math.max(0.1, s.baseAlpha + Math.sin(t * 2.2 + s.phase) * 0.3);
+            ctx.fillStyle = `rgba(255,255,255,${a})`;
+            ctx.fillRect(s.x, s.y, 1, 1);
+        }
+
+        texture.needsUpdate = true;
+    }
+    draw(0);
+    return { texture, draw };
 }
 
 /* Per-panel audio map: uuid → PositionalAudio node for view audio */
 const _panelViewAudio = new Map();
 
+/* Make the outer dome panel look like a regular clear window (the original
+   "window" appearance — light blue tint, transmissive). Used both for the
+   "clear" view and as the outer shell when an Earth-like view is applied
+   (the texture is rendered separately on an inside-only screen). */
+function _setPanelClearWindow(panel) {
+    panel.material.color.set(0x88ccff);
+    panel.material.transmission = 0.6;
+    panel.material.opacity = 0.3;
+    panel.userData.defaultOpacity = 0.3;
+    panel.userData.panelType = 'window';
+    if (panel.material.map) { panel.material.map = null; }
+    if (panel.material.emissiveMap) { panel.material.emissiveMap = null; }
+    panel.material.emissiveIntensity = 0;
+}
+
+/* Add (or update) an inside-only "screen" mesh just behind the panel that
+   displays the procedural Earth-like texture. The screen is single-sided
+   (back-side rendering, since the panel triangles wind CCW when viewed from
+   outside) so it's only visible from inside the dome — the exterior view
+   stays a clear window. */
+function _attachInnerScreen(panel, texture) {
+    if (panel.userData._innerScreen) {
+        const s = panel.userData._innerScreen;
+        s.material.map = texture;
+        s.material.emissiveMap = texture;
+        s.material.needsUpdate = true;
+        return;
+    }
+    const innerGeo = panel.geometry.clone();
+    // First normal entry = panel's outward-pointing normal (all triangles share it).
+    const n = innerGeo.attributes.normal.array;
+    const outward = new THREE.Vector3(n[0], n[1], n[2]).normalize();
+    const offset = 0.08;
+    const pos = innerGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+        pos.array[i * 3]     -= outward.x * offset;
+        pos.array[i * 3 + 1] -= outward.y * offset;
+        pos.array[i * 3 + 2] -= outward.z * offset;
+    }
+    pos.needsUpdate = true;
+
+    const innerMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        map: texture,
+        emissive: new THREE.Color(0xffffff),
+        emissiveMap: texture,
+        emissiveIntensity: 1.0,
+        roughness: 0.4,
+        metalness: 0.1,
+        side: THREE.BackSide
+    });
+    const inner = new THREE.Mesh(innerGeo, innerMat);
+    inner.userData.isInnerScreen = true;
+    panel.add(inner);
+    panel.userData._innerScreen = inner;
+}
+
+function _removeInnerScreen(panel) {
+    const s = panel.userData._innerScreen;
+    if (!s) return;
+    panel.remove(s);
+    s.geometry.dispose();
+    s.material.dispose();
+    delete panel.userData._innerScreen;
+}
+
 function applyViewToPanel(panel, viewId) {
     if (viewId === 'opaque') {
-        // Revert to opaque
         panel.material.color.set(0x8a8a8a);
         panel.material.transmission = 0;
         panel.material.opacity = 1.0;
@@ -1908,19 +2169,25 @@ function applyViewToPanel(panel, viewId) {
         panel.userData.panelType = 'opaque';
         panel.userData.viewOption = null;
         if (panel.material.map) { panel.material.map = null; }
-        // Stop view audio for this panel
+        if (panel.material.emissiveMap) { panel.material.emissiveMap = null; }
+        panel.material.emissiveIntensity = 0;
+        _removeInnerScreen(panel);
+        const pa = _panelViewAudio.get(panel.uuid);
+        if (pa && pa.isPlaying) pa.stop();
+    } else if (viewId === 'regular') {
+        _setPanelClearWindow(panel);
+        panel.userData.viewOption = 'regular';
+        _removeInnerScreen(panel);
         const pa = _panelViewAudio.get(panel.uuid);
         if (pa && pa.isPlaying) pa.stop();
     } else {
         const opt = VIEW_OPTIONS[viewId];
         if (!opt) return;
-        panel.material.color.set(0x88ccff);
-        panel.material.transmission = 0.6;
-        panel.material.opacity = 0.3;
-        panel.userData.defaultOpacity = 0.3;
-        panel.userData.panelType = 'window';
+        // Outer panel = clear regular window (no texture visible from outside).
+        _setPanelClearWindow(panel);
         panel.userData.viewOption = viewId;
-        panel.material.map = getViewTexture(viewId);
+        // Inner screen = self-illuminated texture, only visible from inside.
+        _attachInnerScreen(panel, getViewTexture(viewId));
     }
     if (state.cutaway) panel.material.opacity = 0.15;
     panel.material.needsUpdate = true;
@@ -1935,7 +2202,8 @@ function applyViewToPanel(panel, viewId) {
     // Refresh nature audio if global sound is on
     if (natureBuffer) attachWindowAudio();
 
-    announce(`Window view: ${viewId === 'opaque' ? 'Opaque' : VIEW_OPTIONS[viewId]?.label ?? viewId}`);
+    const labelMap = { opaque: 'Opaque', regular: 'Regular' };
+    announce(`Window view: ${labelMap[viewId] ?? VIEW_OPTIONS[viewId]?.label ?? viewId}`);
 }
 
 /* Show/hide the view selector popup near the clicked screen position */
@@ -2076,6 +2344,119 @@ function updateCircadianFixtures(hour) {
         child.material.color.copy(blended);
         child.material.emissive.copy(blended);
         child.material.emissiveIntensity = intensity;
+        // Store base values so the doorway proximity boost can layer on top.
+        child.userData.baseEmissiveIntensity = intensity;
+    }
+
+    // Per-module ceiling point lights (no visible mesh) — colour + intensity
+    // shift with the same circadian curve so each dome interior reads as
+    // warm at dawn/dusk, cool at noon, dim at night.
+    const lights = state._cached.circadianLights;
+    for (let i = 0, len = lights.length; i < len; i++) {
+        const light = lights[i];
+        light.color.copy(blended);
+        const factor = light.userData.baseIntensityFactor ?? 1.0;
+        // Map circadian intensity (0.04..0.7) to a usable point-light range.
+        light.intensity = 0.15 + intensity * factor;
+    }
+}
+
+/* ============================================
+   Motion Sensor Proximity + Sliding Door Animation
+   ============================================ */
+
+const SENSOR_TRIGGER_DIST = 5.0;   // open the door when within this distance
+const ACTIVE_ZONE_FRAC = 0.25;      // door's "active" portion of corridor (0..0.25 or 0.75..1)
+const SENSOR_LERP_RATE = 5.0;
+const DOOR_LERP_RATE = 4.0;
+const BOOST_DECAY_RATE = 1.6;
+
+/* Airlock cycling. For each corridor we compute the player's axial position
+   along the corridor (t = 0 at the hub-side door, t = 1 at the peripheral-
+   side door). The hub-side door is "active" only while t < 0.25; the
+   peripheral-side door is "active" only while t > 0.75. So the two doors
+   are never simultaneously open: walking through, the door behind closes
+   at the 1/4 mark, then the next door opens at the 3/4 mark. Within an
+   active zone the door additionally needs the player within 5 m, so it
+   doesn't open from across an adjacent module. */
+function updateMotionSensors(delta) {
+    const fpActive = state.viewMode === 'firstperson' && fpControls.isLocked;
+    const camX = camera.position.x;
+    const camZ = camera.position.z;
+
+    const doors = state._cached.doorAssemblies;
+    for (let i = 0; i < doors.length; i++) {
+        const door = doors[i];
+        // Decay any prior boost so the doorway LEDs return to their base
+        // circadian intensity once the player walks away.
+        const b = door.userData.proximityBoost || 0;
+        door.userData.proximityBoost = Math.max(0, b - delta * BOOST_DECAY_RATE);
+
+        let shouldOpen = false;
+        if (fpActive) {
+            const meta = door.userData.corridorMeta;
+            if (meta) {
+                const dx = camX - meta.startX;
+                const dz = camZ - meta.startZ;
+                const axialPos = dx * meta.dirX + dz * meta.dirZ;
+                const t = axialPos / meta.length;
+
+                const ddx = camX - door.userData.worldX;
+                const ddz = camZ - door.userData.worldZ;
+                const distToDoor = Math.sqrt(ddx * ddx + ddz * ddz);
+
+                if (distToDoor < SENSOR_TRIGGER_DIST) {
+                    const endIdx = door.userData.endIndex;
+                    if (endIdx === 0 && t < ACTIVE_ZONE_FRAC)            shouldOpen = true;
+                    else if (endIdx === 1 && t > 1 - ACTIVE_ZONE_FRAC)   shouldOpen = true;
+                }
+            }
+        }
+
+        door.userData.targetOpen = shouldOpen ? 1.0 : 0.0;
+        if (shouldOpen) door.userData.proximityBoost = 1.0;
+    }
+
+    // Sensor lens follows its parent door's target state — bright green when
+    // the door is opening/open, dim ambient otherwise.
+    const sensors = state._cached.motionSensors;
+    for (let i = 0; i < sensors.length; i++) {
+        const sensor = sensors[i];
+        const door = sensor.userData.doorAssembly;
+        const targetOn = (door.userData.targetOpen || 0) > 0.5;
+        const targetIntensity = targetOn ? 1.0 : 0.15;
+        const cur = sensor.userData.activeIntensity;
+        const next = cur + (targetIntensity - cur) * Math.min(1, delta * SENSOR_LERP_RATE);
+        sensor.userData.activeIntensity = next;
+        sensor.userData.lens.material.emissiveIntensity = next;
+    }
+}
+
+function updateSlidingDoors(delta) {
+    const doors = state._cached.doorAssemblies;
+    for (let i = 0; i < doors.length; i++) {
+        const door = doors[i];
+        const cur = door.userData.currentOpen;
+        const target = door.userData.targetOpen;
+        door.userData.currentOpen = cur + (target - cur) * Math.min(1, delta * DOOR_LERP_RATE);
+    }
+    const panels = state._cached.slidingDoors;
+    for (let i = 0; i < panels.length; i++) {
+        const panel = panels[i];
+        const t = panel.userData.doorAssembly.userData.currentOpen;
+        panel.position.x = panel.userData.closedX + (panel.userData.openX - panel.userData.closedX) * t;
+    }
+}
+
+function updateDoorwayBoost() {
+    const leds = state._cached.doorwayLEDs;
+    for (let i = 0; i < leds.length; i++) {
+        const led = leds[i];
+        const door = led.userData.doorAssembly;
+        const boost = door.userData.proximityBoost || 0;
+        if (boost <= 0) continue;
+        const base = led.userData.baseEmissiveIntensity ?? led.material.emissiveIntensity;
+        led.material.emissiveIntensity = base * (1 + 0.8 * boost);
     }
 }
 
@@ -2579,6 +2960,11 @@ function animate() {
     // First-person movement
     updateFirstPerson(delta);
 
+    // Motion sensors → sliding doors → doorway LED boost
+    updateMotionSensors(delta);
+    updateSlidingDoors(delta);
+    updateDoorwayBoost();
+
     // Animate crew
     animateCrew(elapsed);
 
@@ -2590,6 +2976,9 @@ function animate() {
 
     // Animated interior elements
     animateInteriors(elapsed);
+
+    // Animated procedural window views (~10 Hz)
+    updateAnimatedViews(elapsed);
 
     // Door sensor frame scan lines + node pulses
     animateDoorSensors(elapsed);

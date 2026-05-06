@@ -394,11 +394,164 @@ function createFaceGeometry(faceVerts, center) {
 }
 
 /* ============================================
+   Doorway Assembly — Frame, Sliding Doors, LEDs, Motion Sensors
+   ============================================ */
+
+/**
+ * Build a doorway assembly in local coordinates: frame jambs + lintel +
+ * threshold, two sliding panels (closed at center, slide laterally to open),
+ * embedded LED strips on the frame, and two flanking motion-sensor pods on
+ * the +Z (corridor) side. Pods, LEDs, and panels carry userData flags for
+ * the cache + animation systems in habitat-3d.js.
+ *
+ * Local axes: +Z = corridor side (where sensors live); doors slide along ±X.
+ */
+function buildDoorwayAssembly(width, height) {
+    const group = new THREE.Group();
+    group.userData.isDoorwayAssembly = true;
+    group.userData.targetOpen = 0;
+    group.userData.currentOpen = 0;
+    group.userData.proximityBoost = 0;
+
+    const halfW = width / 2;
+    const jambDepth = 0.4;
+    const jambThickness = 0.14;
+
+    const frameMat = new THREE.MeshStandardMaterial({
+        color: 0xc0c4cc, metalness: 0.7, roughness: 0.35
+    });
+    const doorMat = new THREE.MeshStandardMaterial({
+        color: 0xd4d8dd, metalness: 0.6, roughness: 0.3
+    });
+
+    // Jambs
+    const leftJamb = new THREE.Mesh(
+        new THREE.BoxGeometry(jambThickness, height, jambDepth), frameMat
+    );
+    leftJamb.position.set(-halfW - jambThickness / 2, height / 2, 0);
+    leftJamb.castShadow = true;
+    group.add(leftJamb);
+
+    const rightJamb = new THREE.Mesh(
+        new THREE.BoxGeometry(jambThickness, height, jambDepth), frameMat
+    );
+    rightJamb.position.set(halfW + jambThickness / 2, height / 2, 0);
+    rightJamb.castShadow = true;
+    group.add(rightJamb);
+
+    // Lintel
+    const lintel = new THREE.Mesh(
+        new THREE.BoxGeometry(width + 2 * jambThickness, 0.22, jambDepth), frameMat
+    );
+    lintel.position.set(0, height + 0.11, 0);
+    lintel.castShadow = true;
+    group.add(lintel);
+
+    // Threshold
+    const threshold = new THREE.Mesh(
+        new THREE.BoxGeometry(width + 2 * jambThickness, 0.04, jambDepth + 0.2), frameMat
+    );
+    threshold.position.set(0, 0.02, 0);
+    threshold.receiveShadow = true;
+    group.add(threshold);
+
+    // Frame LED strips — visible from both Z sides of the doorway
+    const ledMatTemplate = {
+        color: 0xffeedd, emissive: 0xffeedd, emissiveIntensity: 0.7,
+        roughness: 0.4, metalness: 0.1
+    };
+    const addLED = (geo, x, y, z) => {
+        const mat = new THREE.MeshStandardMaterial({ ...ledMatTemplate });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(x, y, z);
+        mesh.userData.isCircadianFixture = true;
+        mesh.userData.isDoorwayLED = true;
+        mesh.userData.doorAssembly = group;
+        group.add(mesh);
+    };
+
+    // Lintel LEDs (front + back)
+    for (const z of [jambDepth / 2 - 0.02, -(jambDepth / 2 - 0.02)]) {
+        addLED(new THREE.BoxGeometry(width, 0.04, 0.05), 0, height + 0.005, z);
+    }
+    // Jamb LEDs (front + back, on each side)
+    for (const x of [-halfW + 0.04, halfW - 0.04]) {
+        for (const z of [jambDepth / 2 - 0.02, -(jambDepth / 2 - 0.02)]) {
+            addLED(new THREE.BoxGeometry(0.04, height - 0.1, 0.05), x, (height - 0.1) / 2 + 0.05, z);
+        }
+    }
+
+    // Sliding doors — closed at center, slide outward to open
+    const doorThickness = 0.08;
+    const doorH = height - 0.08;
+    const doorW = width / 2;
+
+    const buildSlidingPanel = (closedX, openX) => {
+        const panel = new THREE.Mesh(
+            new THREE.BoxGeometry(doorW, doorH, doorThickness), doorMat.clone()
+        );
+        panel.position.set(closedX, doorH / 2 + 0.04, 0);
+        panel.userData.isSlidingDoor = true;
+        panel.userData.closedX = closedX;
+        panel.userData.openX = openX;
+        panel.userData.doorAssembly = group;
+        panel.castShadow = true;
+        return panel;
+    };
+    group.add(buildSlidingPanel(-width / 4, -3 * width / 4));
+    group.add(buildSlidingPanel( width / 4,  3 * width / 4));
+
+    // Center seam line — subtle blue accent so doors read as "tech"
+    const seam = new THREE.Mesh(
+        new THREE.BoxGeometry(0.025, doorH - 0.1, 0.005),
+        new THREE.MeshStandardMaterial({
+            color: 0x88aaff, emissive: 0x88aaff, emissiveIntensity: 0.5
+        })
+    );
+    seam.position.set(0, doorH / 2 + 0.04, doorThickness / 2 + 0.002);
+    seam.userData.isDoorSeam = true;
+    seam.userData.doorAssembly = group;
+    group.add(seam);
+
+    // Motion-sensor pods flanking the doorway on the +Z (corridor) side
+    const sensorY = 1.6;
+    const sensorZ = jambDepth / 2 + 0.04;
+    for (const sx of [-1, 1]) {
+        const pod = new THREE.Group();
+        pod.position.set(sx * (halfW + jambThickness + 0.18), sensorY, sensorZ);
+        pod.userData.isMotionSensor = true;
+        pod.userData.doorAssembly = group;
+        pod.userData.activeIntensity = 0.15;
+        pod.userData.worldPos = new THREE.Vector3();
+
+        const housing = new THREE.Mesh(
+            new THREE.CapsuleGeometry(0.06, 0.18, 4, 8),
+            new THREE.MeshStandardMaterial({ color: 0x2a3040, metalness: 0.6, roughness: 0.4 })
+        );
+        pod.add(housing);
+
+        const lensMat = new THREE.MeshStandardMaterial({
+            color: 0x224433, emissive: 0x22ff66, emissiveIntensity: 0.15,
+            roughness: 0.2, metalness: 0.5
+        });
+        const lens = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), lensMat);
+        lens.position.set(0, 0, 0.07);
+        pod.add(lens);
+        pod.userData.lens = lens;
+
+        group.add(pod);
+    }
+
+    return group;
+}
+
+/* ============================================
    Connection Corridors
    ============================================ */
 
 /**
- * Build a corridor connecting two module positions. Clean tube + floor.
+ * Build a corridor connecting two module positions. Clean tube + floor +
+ * ceiling LED strip + sliding-airlock doorways at each end.
  * The corridor is trimmed to end at each module's dome surface so it
  * doesn't visibly extend into module interiors.
  */
@@ -464,6 +617,48 @@ function buildCorridor(posA, posB, radiusA, radiusB) {
     floor.rotation.y = angle;
     floor.receiveShadow = true;
     group.add(floor);
+
+    // Ceiling LED strip — emissive bar along the inside top of the tube
+    const ledStrip = new THREE.Mesh(
+        new THREE.BoxGeometry(corridorRadius * 0.55, 0.05, Math.max(0.5, len - 0.4)),
+        new THREE.MeshStandardMaterial({
+            color: 0xffeedd, emissive: 0xffeedd, emissiveIntensity: 0.7,
+            roughness: 0.4, metalness: 0.1
+        })
+    );
+    ledStrip.position.copy(mid);
+    ledStrip.position.y = 2 * corridorRadius - 0.07;
+    ledStrip.rotation.y = angle;
+    ledStrip.userData.isCircadianFixture = true;
+    ledStrip.userData.isCorridorLED = true;
+    group.add(ledStrip);
+
+    // A sliding-airlock doorway at each end of the corridor: one entering
+    // the central hub, one entering the peripheral module. Both doorways
+    // share the corridor metadata used by the airlock-cycling logic in
+    // updateMotionSensors (axial player position + per-end active zones).
+    const doorwayWidth = corridorRadius * 1.6;
+    const doorwayHeight = corridorRadius * 1.7;
+    const corridorMeta = {
+        startX: start.x, startZ: start.z,
+        endX: end.x, endZ: end.z,
+        dirX: dirNorm.x, dirZ: dirNorm.z,
+        length: len
+    };
+
+    const doorwayA = buildDoorwayAssembly(doorwayWidth, doorwayHeight);
+    doorwayA.position.set(start.x, 0, start.z);
+    doorwayA.rotation.y = angle;
+    doorwayA.userData.corridorMeta = corridorMeta;
+    doorwayA.userData.endIndex = 0;
+    group.add(doorwayA);
+
+    const doorwayB = buildDoorwayAssembly(doorwayWidth, doorwayHeight);
+    doorwayB.position.set(end.x, 0, end.z);
+    doorwayB.rotation.y = angle + Math.PI;
+    doorwayB.userData.corridorMeta = corridorMeta;
+    doorwayB.userData.endIndex = 1;
+    group.add(doorwayB);
 
     return group;
 }
