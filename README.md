@@ -38,11 +38,9 @@ The prototype simulates wristband biometric data and displays crew wellbeing ana
 ```
 index.html                    — Dashboard (charts & KPIs)
 pages/habitat-3d.html         — 3D Habitat Simulation
-pages/wristband-3d.html       — Wristband Sci-Fi Viewer
 pages/wristband-product.html  — Wristband Product Viewer
 styles/main.css               — Dashboard styles
 styles/habitat-3d.css         — Habitat 3D HUD styles
-styles/wristband-3d.css       — Wristband viewer styles
 scripts/app.js                — Dashboard entry point
 scripts/data.js               — Mock data generation & scenarios
 scripts/ui.js                 — Dashboard DOM rendering
@@ -51,7 +49,6 @@ scripts/utils.js              — Shared state & helpers
 scripts/habitat-3d.js         — 3D habitat simulation (Three.js)
 scripts/habitat-geometry.js   — Dome & corridor geometry
 scripts/habitat-interiors.js  — Interior furnishing & sensors
-scripts/wristband-3d.js       — Wristband sci-fi viewer
 scripts/wristband-product.js  — Wristband product viewer
 ```
 

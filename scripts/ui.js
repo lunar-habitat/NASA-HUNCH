@@ -59,7 +59,7 @@ const HABITAT_SENSOR_INFO = [
     {
         id: 'pupil', name: 'Pupil Dilation', icon: icon('eye'),
         unit: 'mm', range: '2.0–8.0', key: 'pupilDilationMm',
-        why: 'Pupillometer scans measure dilation correlated with cognitive load and stress',
+        why: "NeurOptics' NPi-300 Pupillometer scans measure dilation correlated with cognitive load and stress",
         systemId: 'facialScans'
     },
     {
@@ -126,10 +126,10 @@ const HABITAT_SENSOR_INFO = [
 const SYSTEMS = [
     {
         id: 'facialScans',
-        name: 'Facial Scans (Pupillometer)',
+        name: "NeurOptics' NPi-300 Pupillometer",
         icon: icon('eye'),
         color: '#f472b6',
-        description: 'Non-invasive pupillometer measuring pupil dilation to assess cognitive load and acute stress',
+        description: "NeurOptics' NPi-300 Pupillometer, a non-invasive optical scanner that measures pupil dilation to assess cognitive load and acute stress. Crew members are trained prior to mission on usages of this device.",
         metrics: ['pupilDilationMm'],
         kpiKeys: ['pupil']
     },
@@ -144,7 +144,7 @@ const SYSTEMS = [
     },
     {
         id: 'hrvMonitoring',
-        name: 'HRV Monitoring (Wristband)',
+        name: 'HRV Monitoring Wristband',
         icon: icon('heartPulse'),
         color: '#ef4444',
         description: 'Wristband sensors monitor HRV, EDA, skin temperature, and heart rate. Reduced gravitational load on the Moon alters cardiovascular demand — baseline HRV and resting HR shift over a mission, making continuous tracking essential for detecting stress, fatigue, and deconditioning',
@@ -162,7 +162,7 @@ const SYSTEMS = [
     },
     {
         id: 'circadianLight',
-        name: 'Circadian Light Panel',
+        name: 'LED Circadian Lighting',
         icon: icon('sun'),
         color: '#facc15',
         description: 'LED panels replicate Earth\'s full light spectrum and day-night rhythm. The lunar day lasts 29.5 Earth days, making artificial circadian cues essential — without them, the body\'s 24-hour biological clock drifts rapidly, degrading sleep, mood, and cognitive performance',
@@ -171,7 +171,7 @@ const SYSTEMS = [
     },
     {
         id: 'greeneryNature',
-        name: 'Greenery & Nature Simulation',
+        name: 'Earth Simulated Views and Landscapes',
         icon: icon('leaf'),
         color: '#22c55e',
         description: 'The lunar surface is grey, airless, and visually stark. Window simulations replace the view with Earth landscapes — forests, oceans, mountains — with matching ambient soundscapes. Greenery and natural imagery are proven countermeasures for confinement stress and psychological monotony',
@@ -567,7 +567,7 @@ function buildWellbeingGauge(index, status) {
  * @param {HTMLElement} container - Where to render (defaults to .kpi-grid).
  * @param {string|null} systemId - If set, only render KPIs for that system.
  */
-function renderKPIs(sample, series, container = null, systemId = null) {
+function renderKPIs(sample, series, container = null, systemId = null, metricKeysOverride = null) {
     const grid = container || document.querySelector('.kpi-grid');
     if (!grid) {
         console.warn('[UI] KPI container not found');
@@ -595,9 +595,12 @@ function renderKPIs(sample, series, container = null, systemId = null) {
         { icon: icon('windowSim'),   label: 'Window Sim',     value: Math.round(sample.windowSimStatus ?? 82),    unit: '/100', sensorId: 'windowSim', metricKey: 'windowSimStatus' }
     ];
 
-    // Filter by system if specified
+    // Filter by system if specified. metricKeysOverride takes precedence so callers
+    // can render a subset of a system's metrics (e.g. just sleep hours).
     let metricsToShow = allMetrics;
-    if (systemId) {
+    if (metricKeysOverride) {
+        metricsToShow = allMetrics.filter(m => metricKeysOverride.includes(m.metricKey));
+    } else if (systemId) {
         const system = SYSTEMS.find(s => s.id === systemId);
         if (system) {
             metricsToShow = allMetrics.filter(m => system.metrics.includes(m.metricKey));
@@ -687,7 +690,7 @@ function renderInsights(sample, series) {
         allInsights.push({ icon: icon('sleepQuality'), text: 'Poor sleep stage composition — review sleeping bag and environment factors', level: 'danger' });
     }
     if ((sample.circadianAlignment ?? 85) < 40) {
-        allInsights.push({ icon: icon('circadian'), text: 'Circadian misalignment — adjust LED light panel schedule', level: 'warning' });
+        allInsights.push({ icon: icon('circadian'), text: 'Circadian misalignment — adjust LED Circadian Lighting schedule', level: 'warning' });
     }
 
     // Environmental cue: nature simulation recommendation
@@ -810,7 +813,8 @@ function initControls() {
                 sleepDeprived: 'Sleep Deprived',
                 exercise: 'High Activity',
                 emergency: 'Emergency Alert',
-                isolation: 'Social Isolation'
+                isolation: 'Social Isolation',
+                eva: 'EVA (Extravehicular Activity)'
             };
             const scenarioName = scenarioNames[e.target.value] || e.target.value;
             fadeRerender();
@@ -1095,15 +1099,9 @@ export function renderWristband() {
         if (!display.querySelector('.view-3d-links')) {
             const linksWrap = createElement('div', 'view-3d-links');
 
-            const link = createElement('a', 'view-3d-link control-btn');
-            link.href = 'pages/wristband-3d.html';
-            link.innerHTML = icon('cube3d', 'sm') + ' Sci-Fi View';
-            link.title = 'Open interactive 3D wristband explorer';
-            linksWrap.appendChild(link);
-
-            const prodLink = createElement('a', 'view-3d-link control-btn');
+            const prodLink = createElement('a', 'view-3d-link view-3d-link--primary');
             prodLink.href = 'pages/wristband-product.html';
-            prodLink.innerHTML = icon('palette', 'sm') + ' Product View';
+            prodLink.textContent = 'Product View';
             prodLink.title = 'Open photorealistic product render';
             linksWrap.appendChild(prodLink);
 
@@ -1265,7 +1263,7 @@ function renderSystemCharts(systemId, series, container, latestSample) {
             const chart = createChart(card, { yMin: 2, yMax: 8, lineColor: '#f472b6', yLabel: 'mm' });
             chart.update(pupilData);
             chart.canvas.setAttribute('role', 'img');
-            chart.canvas.setAttribute('aria-label', 'Pupil dilation trend from pupillometer scans');
+            chart.canvas.setAttribute('aria-label', "Pupil dilation trend from NeurOptics' NPi-300 Pupillometer scans");
             break;
         }
         case 'behavioralPattern': {
@@ -1452,20 +1450,6 @@ function toggleAccordion(systemId) {
         }
         if (chevron) chevron.textContent = '▾';
 
-        // Render charts lazily on first open
-        const chartsContainer = body?.querySelector('.system-accordion__charts');
-        if (chartsContainer && !chartsContainer.dataset.rendered) {
-            const series = (AppState.data && AppState.data.length > 0)
-                ? AppState.data
-                : generateAndStore(AppState.currentScenario, 60);
-            const latestSample = getLatestSample(series);
-            renderSystemCharts(systemId, series, chartsContainer, latestSample);
-            chartsContainer.dataset.rendered = 'true';
-
-            // Recalculate max-height now that charts have been added
-            if (body) body.style.maxHeight = body.scrollHeight + 'px';
-        }
-
         // After transition ends, switch to max-height:none so content is never clipped
         if (body) {
             const onEnd = () => {
@@ -1535,63 +1519,9 @@ export function renderDashboard() {
             <div class="status-pill status-pill--${status}">${statusLabels[status]}</div>
             <div class="status-explanation">${statusExplanations[status]}</div>`;
         kpiGrid.appendChild(statusCard);
-
-        // Light Panel Status
-        const latestTs = latestSample.timestamp ? new Date(latestSample.timestamp) : new Date();
-        const hour = latestTs.getHours();
-        let lightPhase, lightIcon, lightColor;
-        if (hour >= 6 && hour < 10) {
-            lightPhase = 'Dawn'; lightIcon = icon('sunrise', 'sm'); lightColor = '#fb923c';
-        } else if (hour >= 10 && hour < 18) {
-            lightPhase = 'Day'; lightIcon = icon('sun', 'sm'); lightColor = '#facc15';
-        } else if (hour >= 18 && hour < 21) {
-            lightPhase = 'Dusk'; lightIcon = icon('sunset', 'sm'); lightColor = '#f472b6';
-        } else {
-            lightPhase = 'Night'; lightIcon = icon('moon', 'sm'); lightColor = '#818cf8';
-        }
-        const circadianVal = Math.round(latestSample.circadianAlignment ?? 85);
-        const circadianDisplay = AppState.privacyMode ? privacyMask(circadianVal, 'circadian') : circadianVal;
-
-        const lightCard = createElement('div', 'kpi-card kpi-card--lightpanel card');
-        lightCard.innerHTML = `
-            <div class="kpi-label">Light Panel</div>
-            <div class="lightpanel-phase" style="color:${lightColor}">${lightIcon} ${lightPhase}</div>
-            <div class="kpi-value${AppState.privacyMode ? ' privacy-masked' : ''}">${circadianDisplay}</div>
-            <div class="kpi-sublabel">Circadian Alignment</div>`;
-        kpiGrid.appendChild(lightCard);
-
-        // 7 system health summary cards
-        SYSTEMS.forEach(system => {
-            const health = computeSystemHealth(system.id, latestSample);
-            const colorMap = { green: '#22c55e', yellow: '#f59e0b', red: '#ef4444' };
-            const dotColor = colorMap[health.status] || '#38bdf8';
-            const card = createElement('div', 'kpi-card kpi-card--system-summary card');
-            card.dataset.system = system.id;
-            card.style.borderLeftColor = system.color;
-            card.style.cursor = 'pointer';
-            card.title = `Click to expand ${system.name}`;
-            card.innerHTML = `
-                <div class="kpi-icon">${system.icon}</div>
-                <div class="system-summary-row">
-                    <span class="system-status-dot" style="background:${dotColor}"></span>
-                    <span class="kpi-value">${health.score}</span>
-                </div>
-                <div class="kpi-label">${system.name}</div>`;
-            card.addEventListener('click', () => {
-                // Open the accordion for this system and scroll to it
-                if (!AppState.openSystems.has(system.id)) {
-                    toggleAccordion(system.id);
-                }
-                const section = document.querySelector(`.system-accordion[data-system="${system.id}"]`);
-                if (section) {
-                    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            });
-            kpiGrid.appendChild(card);
-        });
     }
 
-    // === Accordion Sections (in .charts-grid) ===
+    // === System Panels (in .charts-grid) ===
     const grid = document.querySelector('.charts-grid');
     if (!grid) {
         console.warn('[UI] .charts-grid not found');
@@ -1599,89 +1529,87 @@ export function renderDashboard() {
     }
     grid.innerHTML = '';
 
-    // Expand/Collapse All toggle
-    const toggleAllBar = createElement('div', 'accordion-controls');
-    const toggleAllBtn = createElement('button', 'control-btn accordion-toggle-all');
-    toggleAllBtn.textContent = '▸ Expand All';
-    toggleAllBtn.title = 'Expand or collapse all system sections';
-    toggleAllBtn.addEventListener('click', () => {
-        const allOpen = SYSTEMS.every(s => AppState.openSystems.has(s.id));
-        if (allOpen) {
-            // Collapse all
-            SYSTEMS.forEach(s => {
-                if (AppState.openSystems.has(s.id)) toggleAccordion(s.id);
-            });
-            toggleAllBtn.textContent = '▸ Expand All';
-        } else {
-            // Expand all
-            SYSTEMS.forEach(s => {
-                if (!AppState.openSystems.has(s.id)) toggleAccordion(s.id);
-            });
-            toggleAllBtn.textContent = '▾ Collapse All';
-        }
-    });
-    toggleAllBar.appendChild(toggleAllBtn);
-    grid.appendChild(toggleAllBar);
+    // Live circadian phase data folded into the Circadian Lighting panel header
+    const phaseFor = (h) => {
+        if (h >= 6 && h < 10)  return { lightPhase: 'Dawn',  lightIcon: icon('sunrise', 'sm'), lightColor: '#fb923c' };
+        if (h >= 10 && h < 18) return { lightPhase: 'Day',   lightIcon: icon('sun', 'sm'),     lightColor: '#facc15' };
+        if (h >= 18 && h < 21) return { lightPhase: 'Dusk',  lightIcon: icon('sunset', 'sm'),  lightColor: '#f472b6' };
+        return                        { lightPhase: 'Night', lightIcon: icon('moon', 'sm'),    lightColor: '#818cf8' };
+    };
+    let circadianLive = null;
+    if (latestSample) {
+        const latestTs = latestSample.timestamp ? new Date(latestSample.timestamp) : new Date();
+        const hour = latestTs.getHours();
+        const circadianVal = Math.round(latestSample.circadianAlignment ?? 85);
+        const circadianDisplay = AppState.privacyMode ? privacyMask(circadianVal, 'circadian') : circadianVal;
+        circadianLive = { hour, ...phaseFor(hour), circadianDisplay };
+    }
 
-    // Build each system accordion
+    // Per-system KPI cards. Only systems listed here render measurements;
+    // others stay description-only.
+    const KPI_METRIC_KEYS_BY_SYSTEM = {
+        hrvMonitoring:      ['heartRateBpm', 'hrvMs', 'edaMicrosiemens', 'skinTempC'],
+        sleepingBagSensors: ['sleepMinutes']
+    };
+
     SYSTEMS.forEach(system => {
-        const isOpen = AppState.openSystems.has(system.id);
-        const health = computeSystemHealth(system.id, latestSample);
-        const colorMap = { green: '#22c55e', yellow: '#f59e0b', red: '#ef4444' };
-        const dotColor = colorMap[health.status] || '#38bdf8';
-
-        const section = createElement('div', `system-accordion${isOpen ? ' is-open' : ''}`);
+        const section = createElement('div', 'system-accordion is-open');
         section.dataset.system = system.id;
 
-        // Header
-        const header = createElement('button', 'system-accordion__header');
-        header.setAttribute('aria-expanded', String(isOpen));
-        header.setAttribute('aria-controls', `accordion-body-${system.id}`);
+        const header = createElement('div', 'system-accordion__header');
         header.style.borderLeftColor = system.color;
+        let liveHtml = '';
+        if (system.id === 'circadianLight' && circadianLive) {
+            liveHtml = `<span class="system-accordion__live" style="color:${circadianLive.lightColor}">${circadianLive.lightIcon} ${circadianLive.lightPhase} · <span class="${AppState.privacyMode ? 'privacy-masked' : ''}">${circadianLive.circadianDisplay}</span></span>`;
+        }
         header.innerHTML = `
             <span class="system-accordion__icon">${system.icon}</span>
             <span class="system-accordion__title">${system.name}</span>
-            <span class="system-status-dot" style="background:${dotColor}" title="System health: ${health.score}"></span>
-            <span class="system-accordion__score">${health.score}</span>
-            <span class="system-accordion__chevron">${isOpen ? '▾' : '▸'}</span>`;
-        header.addEventListener('click', () => toggleAccordion(system.id));
-        header.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                toggleAccordion(system.id);
-            }
-        });
+            ${liveHtml}`;
         section.appendChild(header);
 
-        // Body
-        const body = createElement('div', 'system-accordion__body');
-        body.id = `accordion-body-${system.id}`;
+        const body = createElement('div', 'system-accordion__body transition-done');
         body.setAttribute('role', 'region');
-        body.setAttribute('aria-labelledby', `accordion-header-${system.id}`);
-        header.id = `accordion-header-${system.id}`;
+        body.setAttribute('aria-label', system.name);
 
-        // Description
         const desc = createElement('p', 'system-accordion__desc');
         desc.textContent = system.description;
         body.appendChild(desc);
 
-        // KPI sub-grid
-        const kpiSubGrid = createElement('div', 'system-accordion__kpis kpi-grid');
-        if (latestSample) {
-            renderKPIs(latestSample, series, kpiSubGrid, system.id);
+        const shownKeys = KPI_METRIC_KEYS_BY_SYSTEM[system.id];
+        if (shownKeys && latestSample) {
+            const kpiSubGrid = createElement('div', 'system-accordion__kpis kpi-grid');
+            renderKPIs(latestSample, series, kpiSubGrid, system.id, shownKeys);
+            body.appendChild(kpiSubGrid);
         }
-        body.appendChild(kpiSubGrid);
 
-        // Charts sub-grid
-        const chartsSubGrid = createElement('div', 'system-accordion__charts');
-        body.appendChild(chartsSubGrid);
+        if (system.id === 'circadianLight' && circadianLive) {
+            const formatHour = (h) => {
+                const hi = Math.floor(h);
+                const mi = Math.round((h - hi) * 60);
+                return `${String(hi).padStart(2, '0')}:${String(mi).padStart(2, '0')}`;
+            };
+            const control = createElement('div', 'circadian-control');
+            control.innerHTML = `
+                <label class="circadian-control__label" for="circadian-slider">Preview 24-hour cycle</label>
+                <div class="circadian-control__row">
+                    <input type="range" id="circadian-slider" class="circadian-control__slider" min="0" max="24" step="0.5" value="${circadianLive.hour}" aria-label="Time of day preview">
+                    <span class="circadian-control__time">${formatHour(circadianLive.hour)}</span>
+                </div>`;
+            body.appendChild(control);
 
-        if (isOpen) {
-            body.style.maxHeight = 'none';
-            renderSystemCharts(system.id, series, chartsSubGrid, latestSample);
-            chartsSubGrid.dataset.rendered = 'true';
-        } else {
-            body.style.maxHeight = '0';
+            const slider = control.querySelector('.circadian-control__slider');
+            const timeEl = control.querySelector('.circadian-control__time');
+            const chipEl = header.querySelector('.system-accordion__live');
+            slider.addEventListener('input', () => {
+                const h = parseFloat(slider.value);
+                timeEl.textContent = formatHour(h);
+                const p = phaseFor(h);
+                if (chipEl) {
+                    chipEl.style.color = p.lightColor;
+                    chipEl.innerHTML = `${p.lightIcon} ${p.lightPhase} · <span class="${AppState.privacyMode ? 'privacy-masked' : ''}">${circadianLive.circadianDisplay}</span>`;
+                }
+            });
         }
 
         section.appendChild(body);
@@ -1697,5 +1625,5 @@ export function renderDashboard() {
         renderInsights(latestSample, series);
     }
 
-    console.log('[UI] Dashboard rendered with accordion layout');
+    console.log('[UI] Dashboard rendered with flat panel layout');
 }

@@ -128,6 +128,28 @@ export const SCENARIOS = {
         greeneryExposureMin: 8,
         natureSoundscapeScore: 15,
         windowSimStatus: 30
+    },
+    // Extravehicular Activity — crew is suited up and outside the habitat:
+    // sustained physical exertion, high cognitive vigilance for hazards, no
+    // exposure to greenery / window simulations during the EVA window.
+    eva: {
+        heartRateBpm: 122,
+        hrvMs: 25,
+        edaMicrosiemens: 5.4,
+        skinTempC: 35.2,
+        activityScore: 88,
+        sleepMinutes: 420,   // 7 hours pre-EVA rest
+        restlessnessScore: 25,
+        pupilDilationMm: 5.5,
+        socialScore: 50,     // suit-comm chatter with team
+        routineDeviation: 35,
+        cognitiveLoad: 78,
+        sleepQuality: 70,
+        circadianAlignment: 78,
+        lightSpectrumScore: 80,
+        greeneryExposureMin: 0,
+        natureSoundscapeScore: 0,
+        windowSimStatus: 0
     }
 };
 

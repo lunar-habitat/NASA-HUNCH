@@ -51,11 +51,11 @@ const METRIC_META = {
 const MODULE_SENSORS = {
     hub:         ['pupilDilationMm', 'cognitiveLoad'],
     communal:    ['socialScore', 'routineDeviation'],
-    living:      ['sleepMinutes', 'restlessnessScore', 'circadianAlignment'],
+    living:      ['sleepMinutes', 'restlessnessScore'],
     research:    ['cognitiveLoad'],
-    cultivating: ['greeneryExposureMin', 'lightSpectrumScore'],
+    cultivating: [],
     mechanical:  ['heartRateBpm', 'hrvMs', 'edaMicrosiemens', 'skinTempC'],
-    containment: ['activityScore']
+    containment: []
 };
 
 const CIRCADIAN_PRESETS = {
@@ -794,12 +794,6 @@ function initHUD() {
         });
     }
 
-    // Regenerate
-    const regenBtn = document.getElementById('btn-regenerate');
-    if (regenBtn) {
-        regenBtn.addEventListener('click', refreshData);
-    }
-
     // Privacy toggle
     const privacyBtn = document.getElementById('btn-privacy');
     if (privacyBtn) {
@@ -818,16 +812,6 @@ function initHUD() {
             state.cutaway = !state.cutaway;
             cutawayBtn.setAttribute('aria-pressed', state.cutaway);
             applyCutaway();
-        });
-    }
-
-    // Crew toggle
-    const crewBtn = document.getElementById('btn-crew-toggle');
-    if (crewBtn) {
-        crewBtn.addEventListener('click', () => {
-            state.crewVisible = !state.crewVisible;
-            crewBtn.setAttribute('aria-pressed', state.crewVisible);
-            if (state.crewGroup) state.crewGroup.visible = state.crewVisible;
         });
     }
 
@@ -859,6 +843,20 @@ function initHUD() {
     if (tourSkip) {
         tourSkip.addEventListener('click', stopTour);
     }
+    const tourBack = document.getElementById('tour-back');
+    if (tourBack) {
+        tourBack.addEventListener('click', prevTourStep);
+    }
+    const tourNext = document.getElementById('tour-next');
+    if (tourNext) {
+        tourNext.addEventListener('click', nextTourStep);
+    }
+    document.addEventListener('keydown', (e) => {
+        if (!tourActive) return;
+        if (e.key === 'ArrowRight') { e.preventDefault(); nextTourStep(); }
+        else if (e.key === 'ArrowLeft') { e.preventDefault(); prevTourStep(); }
+        else if (e.key === 'Escape') { e.preventDefault(); stopTour(); }
+    });
 
     // View modes
     document.querySelectorAll('.hud-mode-btn').forEach(btn => {
@@ -951,10 +949,21 @@ function initHUD() {
 
 function updateTimeDisplay() {
     const display = document.getElementById('mission-time-display');
+    const phaseEl = document.getElementById('circadian-phase');
+    const t = state.missionTime;
     if (display) {
-        const h = Math.floor(state.missionTime);
-        const m = Math.round((state.missionTime - h) * 60);
+        const h = Math.floor(t);
+        const m = Math.round((t - h) * 60);
         display.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+    if (phaseEl) {
+        let label, color;
+        if (t >= 6 && t < 10)       { label = 'Dawn';  color = '#fb923c'; }
+        else if (t >= 10 && t < 18) { label = 'Day';   color = '#facc15'; }
+        else if (t >= 18 && t < 21) { label = 'Dusk';  color = '#f472b6'; }
+        else                        { label = 'Night'; color = '#818cf8'; }
+        phaseEl.textContent = label;
+        phaseEl.style.color = color;
     }
 }
 
@@ -975,7 +984,7 @@ const TOUR_WAYPOINTS = [
         target:   [0, 3, 0],
         title:    'Central Hub',
         duration: 5,
-        text:     'The social heart of the habitat. In lunar microgravity, crew move with a bounding low-g gait — the central anchor post and perimeter handrails help control momentum and stabilise during interaction. The pupilometer monitors pupil dilation and cognitive load in the common area.'
+        text:     "The social heart of the habitat. In lunar microgravity, crew move with a bounding low-g gait — the central anchor post and perimeter handrails help control momentum and stabilise during interaction. NeurOptics' NPi-300 Pupillometer monitors pupil dilation and cognitive load in the common area."
     },
     {
         position: [26, 7, 4],
@@ -1023,8 +1032,8 @@ const TOUR_WAYPOINTS = [
         position: [0, 16, 40],
         target:   [0, 3, 0],
         duration: 4,
-        title:    'Circadian Lighting',
-        text:     'Every module shares a unified circadian lighting system. Ceiling fixtures shift from warm dawn tones to cool daylight and dim evening hues, following mission time.'
+        title:    'LED Circadian Lighting',
+        text:     'Every module shares a unified LED Circadian Lighting system. Ceiling fixtures shift from warm dawn tones to cool daylight and dim evening hues, following mission time.'
     },
     {
         position: [50, 40, 50],
@@ -1036,38 +1045,29 @@ const TOUR_WAYPOINTS = [
 ];
 
 let tourIndex = -1;
-let tourTimer = 0;
 let tourActive = false;
 
 function startGuidedTour() {
     if (tourActive) return;
     tourActive = true;
     tourIndex = -1;
-    tourTimer = 0;
 
-    // Disable user controls
     orbitControls.enabled = false;
     if (fpControls.isLocked) fpControls.unlock();
     state.cameraFly = null;
 
-    // Show tour card
     const card = document.getElementById('tour-card');
     if (card) card.hidden = false;
 
-    announce('Guided tour started. Press Skip to exit at any time.');
-    advanceTour();
+    announce('Guided tour started. Use Next and Back to navigate, Skip to exit.');
+    goToTourStep(0);
 }
 
-function advanceTour() {
-    tourIndex++;
-    if (tourIndex >= TOUR_WAYPOINTS.length) {
-        stopTour();
-        return;
-    }
-
+function goToTourStep(index) {
+    if (index < 0 || index >= TOUR_WAYPOINTS.length) return;
+    tourIndex = index;
     const wp = TOUR_WAYPOINTS[tourIndex];
 
-    // Set up camera fly
     state.cameraFly = {
         from:       camera.position.clone(),
         to:         new THREE.Vector3(...wp.position),
@@ -1077,50 +1077,51 @@ function advanceTour() {
         duration:   window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0.01 : 1.2
     };
 
-    // Update narration card
     const titleEl = document.getElementById('tour-card-title');
     const textEl  = document.getElementById('tour-card-text');
+    const stepEl  = document.getElementById('tour-card-step');
+    const backBtn = document.getElementById('tour-back');
+    const nextBtn = document.getElementById('tour-next');
     if (titleEl) titleEl.textContent = wp.title;
     if (textEl)  textEl.textContent  = wp.text;
-
-    // Set timer for auto-advance
-    tourTimer = wp.duration;
+    if (stepEl)  stepEl.textContent  = `${tourIndex + 1} / ${TOUR_WAYPOINTS.length}`;
+    if (backBtn) backBtn.disabled = tourIndex === 0;
+    if (nextBtn) nextBtn.textContent = tourIndex === TOUR_WAYPOINTS.length - 1 ? 'Finish' : 'Next →';
 
     announce(`${wp.title}. ${wp.text}`);
+}
+
+function nextTourStep() {
+    if (!tourActive) return;
+    if (tourIndex >= TOUR_WAYPOINTS.length - 1) {
+        stopTour();
+        return;
+    }
+    goToTourStep(tourIndex + 1);
+}
+
+function prevTourStep() {
+    if (!tourActive || tourIndex <= 0) return;
+    goToTourStep(tourIndex - 1);
 }
 
 function stopTour() {
     tourActive = false;
     tourIndex  = -1;
-    tourTimer  = 0;
 
-    // Hide tour card
     const card = document.getElementById('tour-card');
     if (card) card.hidden = true;
 
-    // Restore overview mode
     orbitControls.enabled = true;
     camera.position.set(30, 25, 30);
     orbitControls.target.set(0, 2, 0);
     state.viewMode = 'overview';
 
-    // Re-activate overview button
     document.querySelectorAll('.hud-mode-btn').forEach(b => b.classList.remove('active'));
     const overviewBtn = document.querySelector('.hud-mode-btn[data-mode="overview"]');
     if (overviewBtn) overviewBtn.classList.add('active');
 
     announce('Tour ended. You are in overview mode.');
-}
-
-/**
- * Called per-frame in animate() to count down tour waypoint timers.
- */
-function updateTour(delta) {
-    if (!tourActive) return;
-    tourTimer -= delta;
-    if (tourTimer <= 0) {
-        advanceTour();
-    }
 }
 
 /* ============================================
@@ -2971,9 +2972,6 @@ function animate() {
     // Sensor hotspot pulsing
     pulseSensorHotspots(elapsed);
 
-    // Guided tour auto-advance
-    updateTour(delta);
-
     // Animated interior elements
     animateInteriors(elapsed);
 
@@ -3076,30 +3074,19 @@ function buildSystemLegend() {
         const meta = METRIC_META[sensorId];
         if (!meta) continue;
 
-        const row = document.createElement('label');
+        const row = document.createElement('div');
         row.className = 'legend-row';
 
         const dot = document.createElement('span');
         dot.className = 'legend-dot';
         dot.style.background = meta.color;
 
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.checked = true;
-        cb.className = 'legend-cb';
-        cb.setAttribute('aria-label', `Show ${meta.label} sensors`);
-        cb.dataset.sensor = sensorId;
-
         const name = document.createElement('span');
         name.className = 'legend-name';
         name.innerHTML = `${meta.icon} ${meta.label}`;
 
-        row.append(dot, cb, name);
+        row.append(dot, name);
         container.appendChild(row);
-
-        cb.addEventListener('change', () => {
-            toggleSensorVisibility(sensorId, cb.checked);
-        });
     }
 }
 
