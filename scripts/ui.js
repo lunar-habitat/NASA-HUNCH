@@ -138,7 +138,7 @@ const SYSTEMS = [
         name: 'Behavioral Pattern Analysis',
         icon: icon('chartBar'),
         color: '#2dd4bf',
-        description: 'Camera-free monitoring via doorway sensors and workstation interactions. In lunar microgravity (1/6 g), crew locomotion is a bounding low-g gait — deviations from expected movement patterns, social withdrawal, and changes in routine are early stress indicators',
+        description: 'Camera-free monitoring via doorway motion sensors and workstation interactions. In lunar microgravity (1/6 g), crew locomotion is a bounding low-g gait — deviations from expected movement patterns, social withdrawal, and changes in routine are early stress indicators',
         metrics: ['socialScore', 'routineDeviation', 'cognitiveLoad', 'activityScore'],
         kpiKeys: ['social', 'routine', 'cognitive', 'activity']
     },
@@ -172,7 +172,7 @@ const SYSTEMS = [
     {
         id: 'greeneryNature',
         name: 'Earth Simulated Views and Landscapes',
-        icon: icon('leaf'),
+        icon: icon('globe'),
         color: '#22c55e',
         description: 'The lunar surface is grey, airless, and visually stark. Window simulations replace the view with Earth landscapes — forests, oceans, mountains — with matching ambient soundscapes. Greenery and natural imagery are proven countermeasures for confinement stress and psychological monotony',
         metrics: ['greeneryExposureMin', 'natureSoundscapeScore', 'windowSimStatus'],

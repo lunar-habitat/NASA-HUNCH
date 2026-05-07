@@ -58,6 +58,31 @@ const MODULE_SENSORS = {
     containment: []
 };
 
+/* Sensor grouping for the System Monitoring legend (12 sensors, 4 systems) */
+const SENSOR_GROUPS = [
+    {
+        name: "NeurOptics' NPi-300 Pupillometer",
+        color: '#f472b6',
+        sensors: ['pupilDilationMm', 'cognitiveLoad']
+    },
+    {
+        name: 'Behavioral Pattern Analysis',
+        color: '#2dd4bf',
+        subtitle: 'Doorway motion sensors + workstation interactions',
+        sensors: ['socialScore', 'routineDeviation']
+    },
+    {
+        name: 'HRV Monitoring Wristband',
+        color: '#ef4444',
+        sensors: ['heartRateBpm', 'hrvMs', 'edaMicrosiemens', 'skinTempC', 'activityScore']
+    },
+    {
+        name: 'Sleeping Bag Pressure Sensors',
+        color: '#60a5fa',
+        sensors: ['sleepMinutes', 'restlessnessScore', 'sleepQuality']
+    }
+];
+
 const CIRCADIAN_PRESETS = {
     0:  { sun: 0.05, ambient: 0.15, temp: 0x1a1a3a },   // midnight
     6:  { sun: 0.3,  ambient: 0.3,  temp: 0xffa54f },   // dawn
@@ -3063,30 +3088,45 @@ function buildSystemLegend() {
     const container = document.getElementById('system-legend');
     if (!container) return;
 
-    // Deduplicate: collect unique sensorIds across all modules
-    const allSensors = new Set();
-    for (const sensors of Object.values(MODULE_SENSORS)) {
-        sensors.forEach(s => allSensors.add(s));
-    }
-
     container.innerHTML = '';
-    for (const sensorId of allSensors) {
-        const meta = METRIC_META[sensorId];
-        if (!meta) continue;
+    for (const group of SENSOR_GROUPS) {
+        const groupEl = document.createElement('div');
+        groupEl.className = 'legend-group';
 
-        const row = document.createElement('div');
-        row.className = 'legend-row';
+        const header = document.createElement('div');
+        header.className = 'legend-group-header';
+        header.style.color = group.color;
+        header.style.borderLeftColor = group.color;
+        header.textContent = group.name;
+        groupEl.appendChild(header);
 
-        const dot = document.createElement('span');
-        dot.className = 'legend-dot';
-        dot.style.background = meta.color;
+        if (group.subtitle) {
+            const sub = document.createElement('div');
+            sub.className = 'legend-group-subtitle';
+            sub.textContent = group.subtitle;
+            groupEl.appendChild(sub);
+        }
 
-        const name = document.createElement('span');
-        name.className = 'legend-name';
-        name.innerHTML = `${meta.icon} ${meta.label}`;
+        for (const sensorId of group.sensors) {
+            const meta = METRIC_META[sensorId];
+            if (!meta) continue;
 
-        row.append(dot, name);
-        container.appendChild(row);
+            const row = document.createElement('div');
+            row.className = 'legend-row';
+
+            const dot = document.createElement('span');
+            dot.className = 'legend-dot';
+            dot.style.background = meta.color;
+
+            const name = document.createElement('span');
+            name.className = 'legend-name';
+            name.innerHTML = `${meta.icon} ${meta.label}`;
+
+            row.append(dot, name);
+            groupEl.appendChild(row);
+        }
+
+        container.appendChild(groupEl);
     }
 }
 
