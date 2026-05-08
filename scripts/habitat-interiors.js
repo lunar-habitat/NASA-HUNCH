@@ -201,6 +201,55 @@ export function furnishModule(moduleGroup, moduleType) {
     cove.userData.isCoveStrip = true;
     moduleGroup.add(cove);
 
+    // Microgravity handrail network — distributed along walls and ceiling
+    // so crew can grip and translate from any orientation (no "down").
+    // Tagged with isHandrail so visibility can be tied to interior views.
+    const railMat = new THREE.MeshStandardMaterial({
+        color: 0xf5f5f5, metalness: 0.25, roughness: 0.45
+    });
+    const railThickness = 0.04;
+    const wallInset = 0.12;
+
+    // Latitude rings climbing the dome (treat dome as hemisphere of `radius`)
+    for (const yFrac of [0.25, 0.5, 0.75]) {
+        const y = radius * yFrac;
+        const ringR = Math.sqrt(Math.max(0, radius * radius - y * y)) - wallInset;
+        if (ringR < 0.5) continue;
+        const ring = new THREE.Mesh(
+            new THREE.TorusGeometry(ringR, railThickness, 6, 48),
+            railMat
+        );
+        ring.rotation.x = Math.PI / 2;
+        ring.position.y = y;
+        ring.castShadow = true;
+        ring.userData.isHandrail = true;
+        moduleGroup.add(ring);
+    }
+
+    // Curved vertical rails — 4 longitudes following the dome surface from
+    // floor edge up toward the apex
+    const verticalCount = 4;
+    for (let i = 0; i < verticalCount; i++) {
+        const theta = (i / verticalCount) * Math.PI * 2;
+        const points = [];
+        const samples = 12;
+        for (let s = 0; s <= samples; s++) {
+            const t = s / samples;
+            const y = t * radius * 0.92;
+            const r = Math.sqrt(Math.max(0, radius * radius - y * y)) - wallInset;
+            points.push(new THREE.Vector3(
+                Math.cos(theta) * r,
+                y,
+                Math.sin(theta) * r
+            ));
+        }
+        const curve = new THREE.CatmullRomCurve3(points);
+        const railGeo = new THREE.TubeGeometry(curve, 24, railThickness, 6, false);
+        const railMesh = new THREE.Mesh(railGeo, railMat);
+        railMesh.castShadow = true;
+        railMesh.userData.isHandrail = true;
+        moduleGroup.add(railMesh);
+    }
 
     // Sensor hotspots — small, at low height so they're not visible from outside above
     const sensors = MODULE_SENSORS[moduleType] || [];

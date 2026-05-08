@@ -871,6 +871,45 @@ body::after {
   }
 }
 
+.systems-category-header {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin: var(--space-lg) 0 var(--space-xs);
+  padding: var(--space-sm) 0;
+  border-bottom: 2px solid rgba(56, 189, 248, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-shadow: 0 0 24px rgba(56, 189, 248, 0.25);
+}
+
+.systems-category-header::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 26px;
+  background: linear-gradient(180deg, #38bdf8, #0ea5e9);
+  border-radius: 3px;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
+}
+
+.systems-category-header--promoting {
+  border-bottom-color: rgba(74, 222, 128, 0.4);
+  text-shadow: 0 0 24px rgba(74, 222, 128, 0.25);
+}
+
+.systems-category-header--promoting::before {
+  background: linear-gradient(180deg, #4ade80, #22c55e);
+  box-shadow: 0 0 12px rgba(74, 222, 128, 0.6);
+}
+
+.systems-category-header:first-child {
+  margin-top: 0;
+}
+
 .chart-card {
   padding: var(--space-md);
   min-height: 200px;
@@ -945,9 +984,42 @@ body::after {
     gap: var(--space-xs);
 }
 
-.kpi-card--wellbeing,
+.kpi-card--wellbeing {
+    grid-column: span 3;
+    flex-direction: row;
+    align-items: stretch;
+    text-align: left;
+    gap: var(--space-lg);
+}
+
+.wellbeing-gauge-side {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: var(--space-xs);
+    flex-shrink: 0;
+    text-align: left;
+}
+
+.wellbeing-info-side {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+}
+
 .kpi-card--status {
     grid-column: span 1;
+}
+
+@media (max-width: 768px) {
+    .kpi-card--wellbeing {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
 }
 
 .kpi-icon {
@@ -1023,6 +1095,167 @@ body::after {
     font-size: var(--font-size-xs);
     color: var(--color-text-secondary);
     margin-top: var(--space-xs);
+}
+
+.wellbeing-formula {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    margin: 0 0 var(--space-sm);
+    line-height: 1.5;
+}
+
+.wellbeing-procedure-title {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 var(--space-sm);
+}
+
+.wellbeing-procedure-title--secondary {
+    margin-top: var(--space-md);
+}
+
+.wellbeing-procedure {
+    list-style: none;
+    margin: 0 0 var(--space-md);
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    counter-reset: wb-step;
+}
+
+.wellbeing-procedure li {
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    align-items: start;
+    gap: 10px;
+    font-size: 0.72rem;
+    line-height: 1.45;
+    color: var(--color-text-secondary);
+}
+
+.wellbeing-step-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(74, 222, 128, 0.15);
+    color: #4ade80;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 1px solid rgba(74, 222, 128, 0.35);
+}
+
+.wellbeing-step-body strong {
+    color: var(--color-text-primary);
+    font-weight: 600;
+    margin-right: 4px;
+}
+
+.wellbeing-excluded {
+    font-size: 0.68rem;
+    color: var(--color-text-secondary);
+    font-style: italic;
+    margin: var(--space-sm) 0 0;
+    padding-top: var(--space-sm);
+    border-top: 1px dashed rgba(148, 163, 184, 0.15);
+    line-height: 1.4;
+}
+
+.wellbeing-legend {
+    list-style: none;
+    margin: 0;
+    padding: var(--space-sm) 0 0;
+    border-top: 1px solid rgba(148, 163, 184, 0.15);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+}
+
+.wellbeing-legend li {
+    display: grid;
+    grid-template-columns: 38px auto 1fr;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.7rem;
+    line-height: 1.3;
+    text-align: left;
+}
+
+.wellbeing-legend-weight {
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: #4ade80;
+    font-size: 0.7rem;
+    text-align: right;
+}
+
+.wellbeing-legend-label {
+    font-weight: 600;
+    color: var(--color-text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.65rem;
+}
+
+.wellbeing-legend-desc {
+    color: var(--color-text-secondary);
+}
+
+.wellbeing-legend-desc em {
+    color: #94a3b8;
+    font-style: italic;
+    font-weight: 500;
+}
+
+.status-legend {
+    list-style: none;
+    margin: var(--space-sm) 0 0;
+    padding: var(--space-sm) 0 0;
+    border-top: 1px solid rgba(148, 163, 184, 0.15);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.status-legend li {
+    display: grid;
+    grid-template-columns: 10px auto 1fr;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.7rem;
+    line-height: 1.3;
+}
+
+.status-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-legend-dot--green  { background: #22c55e; box-shadow: 0 0 6px rgba(34, 197, 94, 0.5); }
+.status-legend-dot--yellow { background: #f59e0b; box-shadow: 0 0 6px rgba(245, 158, 11, 0.5); }
+.status-legend-dot--red    { background: #ef4444; box-shadow: 0 0 6px rgba(239, 68, 68, 0.5); }
+
+.status-legend-label {
+    font-weight: 600;
+    color: var(--color-text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.65rem;
+}
+
+.status-legend-desc {
+    color: var(--color-text-secondary);
 }
 
 /* Habitat-integrated sensor KPI cards */

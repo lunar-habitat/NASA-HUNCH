@@ -70,17 +70,66 @@ export const MODULE_TYPES = {
 };
 
 /* ============================================
+   Secondary Module Specializations
+   ============================================ */
+
+export const SECONDARY_SPECIALIZATIONS = [
+    {
+        id: 'living',
+        moduleType: 'living',
+        name: 'Living Quarters',
+        color: 0xa78bfa,
+        description: 'Private crew berths with sleeping-bag pressure sensors, sleep staging, and personal storage.'
+    },
+    {
+        id: 'communal',
+        moduleType: 'communal',
+        name: 'Communal / Galley',
+        color: 0x22c55e,
+        description: 'Shared dining, recreation, social space, circadian lighting.'
+    },
+    {
+        id: 'research',
+        moduleType: 'research',
+        name: 'Research Laboratory',
+        color: 0xf59e0b,
+        description: 'Lab benches, sample analysis, data processing, EVA prep.'
+    },
+    {
+        id: 'storage',
+        moduleType: 'cultivating',
+        name: 'Storage / Logistics',
+        color: 0x94a3b8,
+        description: 'Consumables, spares, EVA suits, mission cargo, racked stowage.'
+    },
+    {
+        id: 'airlock',
+        moduleType: 'containment',
+        name: 'Airlock / Containment',
+        color: 0xef4444,
+        description: 'EVA staging, suit dock, decontamination, pressure cycling.'
+    },
+    {
+        id: 'mechanical',
+        moduleType: 'mechanical',
+        name: 'Mechanical / Life Support',
+        color: 0x64748b,
+        description: 'Power generation, water recycling, air processing, thermal control.'
+    }
+];
+
+/* ============================================
    Default Layout
    ============================================ */
 
 export const DEFAULT_LAYOUT = [
     { type: 'hub',         position: [0, 0, 0],    name: 'Central Hub' },
-    { type: 'communal',    position: [20, 0, 0],   name: 'Communal Module' },
-    { type: 'living',      position: [-20, 0, 0],  name: 'Living Quarters' },
-    { type: 'research',    position: [0, 0, 20],   name: 'Research Lab' },
-    { type: 'cultivating', position: [0, 0, -20],  name: 'Cultivating Bay' },
-    { type: 'mechanical',  position: [15, 0, 15],  name: 'Mechanical Systems' },
-    { type: 'containment', position: [-15, 0, 15], name: 'Airlock / Containment' }
+    { type: 'communal',    position: [20, 0, 0],   name: 'Secondary Module' },
+    { type: 'living',      position: [-20, 0, 0],  name: 'Secondary Module' },
+    { type: 'research',    position: [0, 0, 20],   name: 'Secondary Module' },
+    { type: 'cultivating', position: [0, 0, -20],  name: 'Secondary Module' },
+    { type: 'mechanical',  position: [15, 0, 15],  name: 'Secondary Module' },
+    { type: 'containment', position: [-15, 0, 15], name: 'Secondary Module' }
 ];
 
 /* ============================================
@@ -239,13 +288,14 @@ function sortFaceVerticesCCW(face, vertices, centerDir, radius) {
  * @param {string} moduleType - Type key
  * @returns {THREE.Group}
  */
-export function buildDomeModule(moduleInfo, moduleName, moduleType) {
+export function buildDomeModule(moduleInfo, moduleName, moduleType, specializationId = null) {
     const group = new THREE.Group();
     group.userData = {
         isDomeModule: true,
         moduleType,
         moduleName,
-        domeRadius: moduleInfo.radius
+        domeRadius: moduleInfo.radius,
+        specializationId
     };
 
     const radius = moduleInfo.radius;
@@ -350,7 +400,9 @@ export function buildDomeModule(moduleInfo, moduleName, moduleType) {
     labelDiv.textContent = moduleName;
     const label = new CSS2DObject(labelDiv);
     label.position.set(0, radius + 1.5, 0);
+    label.userData.isModuleLabel = true;
     group.add(label);
+    group.userData.labelDiv = labelDiv;
 
     return group;
 }
@@ -633,6 +685,71 @@ function buildCorridor(posA, posB, radiusA, radiusB) {
     ledStrip.userData.isCorridorLED = true;
     group.add(ledStrip);
 
+    // Microgravity handrails — rails distributed around the inside of the
+    // tube so crew can grip from any orientation while translating through
+    // the corridor. Tagged with isHandrail for interior-only visibility.
+    const handrailGroup = new THREE.Group();
+    handrailGroup.position.copy(mid);
+    handrailGroup.position.y = corridorRadius; // place at tube center
+    handrailGroup.rotation.y = angle;
+    handrailGroup.userData.isHandrail = true;
+
+    const railMat = new THREE.MeshStandardMaterial({
+        color: 0xf5f5f5, metalness: 0.25, roughness: 0.45
+    });
+    const railRadius = 0.045;
+    const inset = 0.12;
+    const railLen = Math.max(0.3, len * 0.92);
+
+    // Six longitudinal rails distributed around the tube — skip the very
+    // bottom (where the floor strip lives) and the very top (where the LED
+    // strip lives). Angles measured from local +Y (top of tube).
+    const railAngles = [
+        Math.PI * 0.25,   // upper-right
+        Math.PI * 0.5,    // right wall
+        Math.PI * 0.75,   // lower-right
+        -Math.PI * 0.25,  // upper-left
+        -Math.PI * 0.5,   // left wall
+        -Math.PI * 0.75   // lower-left
+    ];
+    const innerR = corridorRadius - inset;
+
+    for (const a of railAngles) {
+        const rx = Math.sin(a) * innerR;
+        const ry = Math.cos(a) * innerR;
+        const rail = new THREE.Mesh(
+            new THREE.CylinderGeometry(railRadius, railRadius, railLen, 8),
+            railMat
+        );
+        rail.rotation.x = Math.PI / 2;
+        rail.position.set(rx, ry, 0);
+        rail.castShadow = true;
+        handrailGroup.add(rail);
+
+        // Radial brackets every ~2.5 m anchoring the rail to the tube wall
+        const bracketCount = Math.max(2, Math.floor(railLen / 2.5));
+        const bracketLen = inset;
+        for (let i = 0; i < bracketCount; i++) {
+            const t = bracketCount === 1 ? 0 : (i / (bracketCount - 1) - 0.5);
+            const bracket = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.022, 0.022, bracketLen, 6),
+                railMat
+            );
+            // Orient bracket along the radial direction from tube center
+            bracket.position.set(
+                rx + Math.sin(a) * (bracketLen / 2),
+                ry + Math.cos(a) * (bracketLen / 2),
+                t * railLen
+            );
+            // Rotate cylinder to point along (sin a, cos a)
+            bracket.rotation.z = -a;
+            bracket.castShadow = true;
+            handrailGroup.add(bracket);
+        }
+    }
+
+    group.add(handrailGroup);
+
     // A sliding-airlock doorway at each end of the corridor: one entering
     // the central hub, one entering the peripheral module. Both doorways
     // share the corridor metadata used by the airlock-cycling logic in
@@ -681,7 +798,7 @@ export function buildHabitat(layout) {
         const info = MODULE_TYPES[mod.type];
         if (!info) continue;
 
-        const dome = buildDomeModule(info, mod.name, mod.type);
+        const dome = buildDomeModule(info, mod.name, mod.type, mod.specializationId || null);
         dome.position.set(mod.position[0], mod.position[1], mod.position[2]);
         group.add(dome);
         modules.push({ position: mod.position, radius: info.radius });
@@ -714,8 +831,11 @@ export function buildHabitat(layout) {
 export function rebuildHabitat(scene, state) {
     if (state.habitatGroup) {
         scene.remove(state.habitatGroup);
-        // Dispose geometries and materials
         state.habitatGroup.traverse(child => {
+            // Remove leaked CSS2DObject DOM elements
+            if (child.isCSS2DObject && child.element && child.element.parentNode) {
+                child.element.parentNode.removeChild(child.element);
+            }
             if (child.geometry) child.geometry.dispose();
             if (child.material) {
                 if (Array.isArray(child.material)) {

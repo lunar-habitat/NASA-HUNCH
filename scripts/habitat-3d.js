@@ -12,7 +12,7 @@ import { RenderPass }         from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass }    from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 import { SCENARIOS, getCurrentSample, generateSeries, computeWellbeingIndex, computeStatus } from './data.js';
-import { buildHabitat, MODULE_TYPES, DEFAULT_LAYOUT, rebuildHabitat, CORRIDOR_RADIUS } from './habitat-geometry.js';
+import { buildHabitat, MODULE_TYPES, DEFAULT_LAYOUT, SECONDARY_SPECIALIZATIONS, rebuildHabitat, CORRIDOR_RADIUS } from './habitat-geometry.js';
 import { furnishModule } from './habitat-interiors.js';
 import { icon } from './icons.js';
 
@@ -941,6 +941,20 @@ function initHUD() {
         });
     });
 
+    // Populate the rearrange-mode picker grid from SECONDARY_SPECIALIZATIONS
+    const pickerGrid = document.querySelector('#module-picker .module-picker-grid');
+    if (pickerGrid) {
+        pickerGrid.innerHTML = SECONDARY_SPECIALIZATIONS.map(s => `
+            <button class="module-pick-btn" data-spec-id="${s.id}" aria-label="Add ${s.name} module">
+                <span class="module-pick-dot" style="background:#${s.color.toString(16).padStart(6, '0')}"></span>
+                <span class="module-pick-text">
+                    <strong>${s.name}</strong>
+                    <span class="module-pick-desc">${s.description}</span>
+                </span>
+            </button>
+        `).join('');
+    }
+
     // Add Module — show/hide picker
     document.getElementById('btn-add-module')?.addEventListener('click', () => {
         const picker = document.getElementById('module-picker');
@@ -953,8 +967,9 @@ function initHUD() {
     // Module picker buttons
     document.querySelectorAll('.module-pick-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            const type = btn.dataset.type;
-            if (type) addModule(type);
+            const specId = btn.dataset.specId;
+            const spec = SECONDARY_SPECIALIZATIONS.find(s => s.id === specId);
+            if (spec) addModule(spec.moduleType, spec);
             document.getElementById('module-picker')?.setAttribute('hidden', '');
         });
     });
@@ -1015,43 +1030,43 @@ const TOUR_WAYPOINTS = [
         position: [26, 7, 4],
         target:   [20, 3, 0],
         duration: 5,
-        title:    'Communal Module',
-        text:     'Shared dining and recreation space. Handrails along the perimeter help crew navigate the low-gravity environment safely. Doorway motion sensors track social interaction patterns and routine deviations to support group wellbeing.'
+        title:    'Secondary Module',
+        text:     ''
     },
     {
         position: [-26, 7, -4],
         target:   [-20, 3, 0],
         duration: 5,
-        title:    'Living Quarters',
-        text:     'Private berths with sleeping bag pressure sensors. In lunar gravity, crew are anchored in sleeping bags to prevent drifting from low-g movement during sleep. Pressure sensors track sleep duration, stages, restlessness, and circadian alignment throughout each rest cycle.'
+        title:    'Secondary Module',
+        text:     ''
     },
     {
         position: [4, 7, 26],
         target:   [0, 3, 20],
         duration: 5,
-        title:    'Research Laboratory',
-        text:     'Research workstations with an overhead anchor rail to brace against in low gravity during precision tasks. Pupillometry detects cognitive fatigue, while EDA sensors on the wristband monitor stress levels throughout experiment sessions.'
+        title:    'Secondary Module',
+        text:     ''
     },
     {
         position: [-4, 7, -26],
         target:   [0, 3, -20],
         duration: 5,
-        title:    'Cultivating Bay',
-        text:     'Hydroponic gardens provide food and psychological respite. Greenery exposure time, light spectrum, and nature soundscape scores are continuously measured.'
+        title:    'Secondary Module',
+        text:     ''
     },
     {
         position: [21, 7, 19],
         target:   [15, 3, 15],
         duration: 5,
-        title:    'Mechanical Systems',
-        text:     'Lunar gravity reduces skeletal load to just 1/6th of Earth\'s, accelerating muscle and bone loss without countermeasures. Exercise equipment here targets that risk directly. HRV wristband sensors monitor cardiovascular effort and recovery in real time.'
+        title:    'Secondary Module',
+        text:     ''
     },
     {
         position: [-21, 7, 19],
         target:   [-15, 3, 15],
         duration: 5,
-        title:    'Airlock & Containment',
-        text:     'EVA staging and decontamination area. Doorway motion sensors at the airlock entrance track activity score and flag deviations from safe ingress/egress protocols. Lunar regolith dust is abrasive and toxic — decontamination here protects the pressurised habitat.'
+        title:    'Secondary Module',
+        text:     ''
     },
     {
         position: [0, 16, 40],
@@ -1192,6 +1207,8 @@ function switchViewMode(mode) {
             announce('Rearrangement mode. Drag modules to reposition.');
             break;
     }
+
+    applyHandrailVisibility();
 }
 
 /* ============================================
@@ -1205,6 +1222,17 @@ function applyCutaway() {
             child.material.opacity  = state.cutaway ? 0.15 : child.userData.defaultOpacity;
             child.material.transparent = true;
             child.material.needsUpdate = true;
+        }
+    });
+    applyHandrailVisibility();
+}
+
+function applyHandrailVisibility() {
+    if (!state.habitatGroup) return;
+    const showRails = state.viewMode === 'firstperson' || state.cutaway;
+    state.habitatGroup.traverse(child => {
+        if (child.userData.isHandrail) {
+            child.visible = showRails;
         }
     });
 }
@@ -1475,6 +1503,23 @@ function showModulePanel(obj) {
         metricsHtml = '<p class="sensor-meta"><em>Privacy mode active</em></p>';
     }
 
+    const activeSpecId = node.userData.specializationId || null;
+    const specHtml = (moduleType !== 'hub') ? `
+        <div class="module-divider"></div>
+        <p class="module-section-title">Specialize as</p>
+        <div class="module-specializations">
+            ${SECONDARY_SPECIALIZATIONS.map(s => `
+                <button class="legend-row module-spec-row${s.id === activeSpecId ? ' is-active' : ''}" data-spec-id="${s.id}">
+                    <span class="legend-dot" style="background:#${s.color.toString(16).padStart(6, '0')}"></span>
+                    <span class="legend-name">
+                        <strong>${s.name}</strong>
+                        <span class="module-spec-desc">${s.description}</span>
+                    </span>
+                </button>
+            `).join('')}
+        </div>
+    ` : '';
+
     body.innerHTML = `
         <p><strong>Type:</strong> <span class="module-value">${moduleType}</span></p>
         <p><strong>Systems:</strong></p>
@@ -1485,11 +1530,40 @@ function showModulePanel(obj) {
         <div class="module-divider"></div>
         <p><strong>Greenery:</strong> <span class="module-value">Active</span></p>
         <p><strong>Circadian:</strong> <span class="module-value">${state.missionTime.toFixed(1)}h</span></p>
+        ${specHtml}
     `;
+
+    body.querySelectorAll('.module-spec-row').forEach(btn => {
+        btn.addEventListener('click', () => assignSpecialization(node, btn.dataset.specId));
+    });
 
     // Close sensor panel if open
     document.getElementById('sensor-panel')?.classList.remove('open');
     panel.classList.add('open');
+}
+
+function assignSpecialization(moduleGroup, specId) {
+    const spec = SECONDARY_SPECIALIZATIONS.find(s => s.id === specId);
+    if (!spec || !moduleGroup) return;
+
+    moduleGroup.userData.moduleName = spec.name;
+    moduleGroup.userData.specializationId = spec.id;
+
+    if (moduleGroup.userData.labelDiv) {
+        moduleGroup.userData.labelDiv.textContent = spec.name;
+    }
+
+    const layoutEntry = state.layout.find(m =>
+        m.type === moduleGroup.userData.moduleType &&
+        Math.abs(m.position[0] - moduleGroup.position.x) < 0.01 &&
+        Math.abs(m.position[2] - moduleGroup.position.z) < 0.01
+    );
+    if (layoutEntry) {
+        layoutEntry.name = spec.name;
+        layoutEntry.specializationId = spec.id;
+    }
+
+    showModulePanel(moduleGroup);
 }
 
 function showSensorPanel(sensorId) {
@@ -2580,6 +2654,7 @@ function fullRebuild() {
     });
     cacheAnimatedObjects();
     updateCircadianFixtures(state.missionTime);
+    applyHandrailVisibility();
     // Re-attach positional audio to new window panels
     if (natureBuffer) attachWindowAudio();
 }
@@ -2715,7 +2790,7 @@ function updateSnapAnimation(delta) {
    Add / Remove Modules
    ============================================ */
 
-function addModule(type) {
+function addModule(type, spec = null) {
     // Find next open slot
     const slot = findNearestOpenSlot(SLOT_RADIUS, 0);
     if (!slot) {
@@ -2726,16 +2801,21 @@ function addModule(type) {
     const info = MODULE_TYPES[type];
     if (!info) return;
 
-    // Generate unique name
-    const count = state.layout.filter(m => m.type === type).length;
-    const name = `${info.name} ${count + 1}`;
+    // Use spec name if provided; otherwise fall back to type-based naming
+    const baseName = spec ? spec.name : info.name;
+    const count = state.layout.filter(m =>
+        spec ? m.specializationId === spec.id : (m.type === type && !m.specializationId)
+    ).length;
+    const name = count > 0 ? `${baseName} ${count + 1}` : baseName;
 
-    // Add to layout
-    state.layout.push({
+    const entry = {
         type,
         position: [slot.x, 0, slot.z],
         name
-    });
+    };
+    if (spec) entry.specializationId = spec.id;
+
+    state.layout.push(entry);
 
     fullRebuild();
     announce(`Added ${name}.`);
@@ -3219,6 +3299,7 @@ async function init() {
             furnishModule(child, child.userData.moduleType);
         }
     });
+    applyHandrailVisibility();
     setLoadProgress(70, 'Populating crew…');
 
     // Crew

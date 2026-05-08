@@ -1501,9 +1501,29 @@ export function renderDashboard() {
 
         const wbCard = createElement('div', 'kpi-card kpi-card--wellbeing card');
         wbCard.innerHTML = `
-            <div class="kpi-label">Wellbeing Index</div>
-            <div class="wellbeing-gauge">${buildWellbeingGauge(wbIndex, status)}</div>
-            <div class="kpi-sublabel">Conceptual composite score</div>`;
+            <div class="wellbeing-gauge-side">
+                <div class="kpi-label">Wellbeing Index</div>
+                <div class="wellbeing-gauge">${buildWellbeingGauge(wbIndex, status)}</div>
+                <div class="kpi-sublabel">Conceptual composite score</div>
+            </div>
+            <div class="wellbeing-info-side">
+                <p class="wellbeing-procedure-title">How it's calculated</p>
+                <ol class="wellbeing-procedure">
+                    <li><span class="wellbeing-step-num">1</span><span class="wellbeing-step-body"><strong>Sample.</strong> Habitat sensors stream 11 measured wellbeing signals every minute &mdash; wristband (HR, HRV, EDA), sleeping-bag pressure pad, NPi-300 pupillometer, doorway motion sensors.</span></li>
+                    <li><span class="wellbeing-step-num">2</span><span class="wellbeing-step-body"><strong>Normalize.</strong> Each raw signal is mapped to a 0&ndash;100 sub-score (e.g., heart rate at 70&nbsp;bpm scores 100, drops as it deviates; sleep duration at 8&nbsp;h scores 100).</span></li>
+                    <li><span class="wellbeing-step-num">3</span><span class="wellbeing-step-body"><strong>Average.</strong> Take the last 10 minutes (10 samples) of each signal and average them &mdash; smooths out one-off spikes like a sneeze or laugh.</span></li>
+                    <li><span class="wellbeing-step-num">4</span><span class="wellbeing-step-body"><strong>Weight &amp; sum.</strong> Multiply each averaged sub-score by its group weight (below), sum them to get the final 0&ndash;100 index.</span></li>
+                    <li><span class="wellbeing-step-num">5</span><span class="wellbeing-step-body"><strong>Classify.</strong> Index &ge;&nbsp;80 &rarr; Green, 60&ndash;79 &rarr; Yellow, &lt;&nbsp;60 &rarr; Red. Drives the Crew Status pill.</span></li>
+                </ol>
+                <p class="wellbeing-procedure-title wellbeing-procedure-title--secondary">Group weights (step 4)</p>
+                <ul class="wellbeing-legend">
+                    <li><span class="wellbeing-legend-weight">35%</span><span class="wellbeing-legend-label">Cardiovascular</span><span class="wellbeing-legend-desc">Heart rate, HRV, electrodermal activity &mdash; <em>wristband</em></span></li>
+                    <li><span class="wellbeing-legend-weight">28%</span><span class="wellbeing-legend-label">Sleep</span><span class="wellbeing-legend-desc">Duration, quality, restlessness &mdash; <em>sleeping-bag pressure sensors</em></span></li>
+                    <li><span class="wellbeing-legend-weight">19%</span><span class="wellbeing-legend-label">Cognitive</span><span class="wellbeing-legend-desc">Pupil dilation, cognitive load &mdash; <em>NPi-300 pupillometer</em></span></li>
+                    <li><span class="wellbeing-legend-weight">18%</span><span class="wellbeing-legend-label">Behavioral</span><span class="wellbeing-legend-desc">Social interaction, routine, activity &mdash; <em>doorway motion sensors</em></span></li>
+                </ul>
+                <p class="wellbeing-excluded">LED circadian lighting and the Earth-window simulation are excluded &mdash; they support crew mental health rather than measure it.</p>
+            </div>`;
         kpiGrid.appendChild(wbCard);
 
         // Crew Status pill
@@ -1517,7 +1537,12 @@ export function renderDashboard() {
         statusCard.innerHTML = `
             <div class="kpi-label">Crew Status</div>
             <div class="status-pill status-pill--${status}">${statusLabels[status]}</div>
-            <div class="status-explanation">${statusExplanations[status]}</div>`;
+            <div class="status-explanation">${statusExplanations[status]}</div>
+            <ul class="status-legend">
+                <li><span class="status-legend-dot status-legend-dot--green"></span><span class="status-legend-label">Green</span><span class="status-legend-desc">${statusExplanations.green}</span></li>
+                <li><span class="status-legend-dot status-legend-dot--yellow"></span><span class="status-legend-label">Yellow</span><span class="status-legend-desc">${statusExplanations.yellow}</span></li>
+                <li><span class="status-legend-dot status-legend-dot--red"></span><span class="status-legend-label">Red</span><span class="status-legend-desc">${statusExplanations.red}</span></li>
+            </ul>`;
         kpiGrid.appendChild(statusCard);
     }
 
@@ -1552,7 +1577,26 @@ export function renderDashboard() {
         sleepingBagSensors: ['sleepMinutes']
     };
 
+    const PROMOTING_SYSTEM_IDS = new Set(['circadianLight', 'greeneryNature']);
+    let monitoringHeaderInserted = false;
+    let promotingHeaderInserted = false;
+
     SYSTEMS.forEach(system => {
+        const isPromoting = PROMOTING_SYSTEM_IDS.has(system.id);
+
+        if (!isPromoting && !monitoringHeaderInserted) {
+            const h = createElement('h3', 'systems-category-header');
+            h.textContent = 'Mental Health Monitoring Systems';
+            grid.appendChild(h);
+            monitoringHeaderInserted = true;
+        }
+        if (isPromoting && !promotingHeaderInserted) {
+            const h = createElement('h3', 'systems-category-header systems-category-header--promoting');
+            h.textContent = 'Technologies Promoting Mental Health';
+            grid.appendChild(h);
+            promotingHeaderInserted = true;
+        }
+
         const section = createElement('div', 'system-accordion is-open');
         section.dataset.system = system.id;
 

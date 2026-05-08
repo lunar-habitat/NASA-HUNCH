@@ -184,16 +184,11 @@
             </div>
         </div>
 
-        <!-- Module type picker (for add) -->
+        <!-- Module specialization picker (for add) -->
         <div id="module-picker" class="module-picker hud-panel" hidden>
-            <div class="module-picker-title">Select Module Type</div>
-            <div class="module-picker-grid" role="group" aria-label="Module types">
-                <button class="module-pick-btn" data-type="communal" aria-label="Add communal module"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V9l9-7 9 7v12"/><path d="M9 21V12h6v9"/></svg> Communal</button>
-                <button class="module-pick-btn" data-type="living" aria-label="Add living module"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h2a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2V12z"/><path d="M22 12h-2a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h2V12z"/><path d="M6 12V7a6 6 0 0 1 12 0v5"/><rect x="6" y="12" width="12" height="8" rx="2"/></svg> Living</button>
-                <button class="module-pick-btn" data-type="research" aria-label="Add research module"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6v5a3 3 0 0 1-6 0V3z"/><path d="M12 8v8"/><path d="M7 19c0-2.21 2.24-4 5-4s5 1.79 5 4"/><line x1="7" y1="19" x2="7" y2="21"/><line x1="17" y1="19" x2="17" y2="21"/><line x1="6" y1="21" x2="18" y2="21"/></svg> Research</button>
-                <button class="module-pick-btn" data-type="mechanical" aria-label="Add mechanical module"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Mechanical</button>
-                <button class="module-pick-btn" data-type="cultivating" aria-label="Add cultivating module"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8c.7-1 1.04-2.13 1-3.39A6.27 6.27 0 0 0 12.52 1a5.65 5.65 0 0 0-1.04 3.39A6.2 6.2 0 0 0 17 8z"/><path d="M7 16c-.7 1-1.04 2.13-1 3.39A6.27 6.27 0 0 0 11.48 23a5.65 5.65 0 0 0 1.04-3.39A6.2 6.2 0 0 0 7 16z"/><path d="M12 8v8"/></svg> Cultivating</button>
-                <button class="module-pick-btn" data-type="containment" aria-label="Add containment module"><svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Containment</button>
+            <div class="module-picker-title">Select Module Specialization</div>
+            <div class="module-picker-grid" role="group" aria-label="Module specializations">
+                <!-- Populated dynamically from SECONDARY_SPECIALIZATIONS -->
             </div>
         </div>
     </div>

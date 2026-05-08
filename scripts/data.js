@@ -283,17 +283,15 @@ export function generateSeries(scenario, minutes = 60) {
  *   Routine Dev:     100 − routineDeviation
  *   Cognitive Load:  100 − cognitiveLoad × 0.8
  *   Sleep Quality:   sleepQuality directly
- *   Circadian:       circadianAlignment directly
- *   Light Spectrum:  lightSpectrumScore directly
- *   Greenery:        greeneryExposureMin / 90 × 100 (90 min is ideal)
- *   Soundscape:      natureSoundscapeScore directly
- *   Window Sim:      windowSimStatus directly
+ *
+ * Environment-class signals (LED circadian, light spectrum, greenery,
+ * soundscape, Earth-window simulation) are excluded — they're crew
+ * support amenities, not measured wellbeing outcomes.
  *
  * Final index = weighted average, clamped 0–100.
- * Weights: HR(10%), HRV(8%), EDA(8%), SleepDur(8%), Restlessness(6%),
- *          Activity(4%), Pupil(8%), Social(6%),
- *          RoutineDev(4%), CogLoad(6%), SleepQuality(8%), Circadian(6%),
- *          LightSpectrum(5%), Greenery(4%), Soundscape(4%), WindowSim(5%)
+ * Weights: HR(13%), HRV(11%), EDA(11%), SleepDur(11%), Restlessness(8%),
+ *          Activity(5%), Pupil(11%), Social(8%), RoutineDev(5%),
+ *          CogLoad(8%), SleepQuality(9%) — sum = 1.00
  *
  * If `rollingWindow` is provided, metrics are averaged across the
  * window before applying the formula (produces a smoothed index).
@@ -318,12 +316,7 @@ export function computeWellbeingIndex(sample, rollingWindow = null) {
             socialScore:        rollingWindow.reduce((s, p) => s + (p.socialScore ?? 70), 0) / len,
             routineDeviation:   rollingWindow.reduce((s, p) => s + (p.routineDeviation ?? 12), 0) / len,
             cognitiveLoad:      rollingWindow.reduce((s, p) => s + (p.cognitiveLoad ?? 30), 0) / len,
-            sleepQuality:       rollingWindow.reduce((s, p) => s + (p.sleepQuality ?? 78), 0) / len,
-            circadianAlignment: rollingWindow.reduce((s, p) => s + (p.circadianAlignment ?? 85), 0) / len,
-            lightSpectrumScore: rollingWindow.reduce((s, p) => s + (p.lightSpectrumScore ?? 88), 0) / len,
-            greeneryExposureMin: rollingWindow.reduce((s, p) => s + (p.greeneryExposureMin ?? 65), 0) / len,
-            natureSoundscapeScore: rollingWindow.reduce((s, p) => s + (p.natureSoundscapeScore ?? 75), 0) / len,
-            windowSimStatus:    rollingWindow.reduce((s, p) => s + (p.windowSimStatus ?? 82), 0) / len
+            sleepQuality:       rollingWindow.reduce((s, p) => s + (p.sleepQuality ?? 78), 0) / len
         };
     }
 
@@ -358,39 +351,20 @@ export function computeWellbeingIndex(sample, rollingWindow = null) {
     // Sleep quality: higher is better (from sleeping bag pressure sensors)
     const sleepQualComponent = clamp(effective.sleepQuality ?? 78, 0, 100);
 
-    // Circadian alignment: higher is better (LED panel + rhythm tracking)
-    const circadianComponent = clamp(effective.circadianAlignment ?? 85, 0, 100);
-
-    // Light spectrum: higher is better (how closely LED replicates Earth spectrum)
-    const lightSpectrumComponent = clamp(effective.lightSpectrumScore ?? 88, 0, 100);
-
-    // Greenery exposure: 90 minutes is ideal daily target
-    const greenery = effective.greeneryExposureMin ?? 65;
-    const greeneryComponent = clamp(greenery / 90 * 100, 0, 100);
-
-    // Nature soundscape: higher is better
-    const soundscapeComponent = clamp(effective.natureSoundscapeScore ?? 75, 0, 100);
-
-    // Window simulation: higher is better
-    const windowSimComponent = clamp(effective.windowSimStatus ?? 82, 0, 100);
-
-    // Rebalanced weighted average across all 16 components (sum = 1.00)
-    const avg = hrComponent       * 0.10
-             + hrvComponent      * 0.08
-             + edaComponent      * 0.08
-             + sleepComponent    * 0.08
-             + restComponent     * 0.06
-             + actComponent      * 0.04
-             + pupilComponent    * 0.08
-             + socialComponent   * 0.06
-             + routineComponent  * 0.04
-             + cogComponent      * 0.06
-             + sleepQualComponent * 0.08
-             + circadianComponent * 0.06
-             + lightSpectrumComponent * 0.05
-             + greeneryComponent * 0.04
-             + soundscapeComponent * 0.04
-             + windowSimComponent * 0.05;
+    // Weighted average across 11 measured wellbeing components (sum = 1.00).
+    // Environment-class signals (circadian/light/greenery/soundscape/window)
+    // are excluded — they're amenities, not outcomes.
+    const avg = hrComponent       * 0.13
+             + hrvComponent      * 0.11
+             + edaComponent      * 0.11
+             + sleepComponent    * 0.11
+             + restComponent     * 0.08
+             + actComponent      * 0.05
+             + pupilComponent    * 0.11
+             + socialComponent   * 0.08
+             + routineComponent  * 0.05
+             + cogComponent      * 0.08
+             + sleepQualComponent * 0.09;
 
     return Math.round(clamp(avg, 0, 100));
 }
