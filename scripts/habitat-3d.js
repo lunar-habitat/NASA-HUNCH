@@ -1,0 +1,3346 @@
+/**
+ * @fileoverview 3D Lunar Habitat Simulation — Main entry point.
+ * Sets up a Three.js scene with modular dome habitat, lunar terrain,
+ * starfield, circadian lighting, crew members, and interactive HUD.
+ */
+import * as THREE from 'three';
+import { OrbitControls }      from 'three/addons/controls/OrbitControls.js';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { EffectComposer }     from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass }         from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass }    from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+import { SCENARIOS, getCurrentSample, generateSeries, computeWellbeingIndex, computeStatus } from './data.js';
+import { buildHabitat, MODULE_TYPES, DEFAULT_LAYOUT, SECONDARY_SPECIALIZATIONS, rebuildHabitat, CORRIDOR_RADIUS } from './habitat-geometry.js';
+import { furnishModule } from './habitat-interiors.js';
+import { icon } from './icons.js';
+
+/* ============================================
+   Constants
+   ============================================ */
+
+const STATUS_COLORS = {
+    green:  new THREE.Color(0x22c55e),
+    yellow: new THREE.Color(0xf59e0b),
+    red:    new THREE.Color(0xef4444)
+};
+
+/* Metric metadata for sensor panel display */
+const METRIC_META = {
+    heartRateBpm:       { label: 'Heart Rate',          unit: 'bpm',  min: 40,  max: 180, icon: icon('heart'),       color: '#ef4444' },
+    hrvMs:              { label: 'HRV',                 unit: 'ms',   min: 10,  max: 150, icon: icon('chartBar'),    color: '#f472b6' },
+    edaMicrosiemens:    { label: 'Electrodermal',       unit: 'µS',   min: 0.1, max: 10,  icon: icon('zap'),         color: '#facc15' },
+    skinTempC:          { label: 'Skin Temperature',    unit: '°C',   min: 30,  max: 38,  icon: icon('thermometer'), color: '#fb923c' },
+    activityScore:      { label: 'Activity',            unit: '',     min: 0,   max: 100, icon: icon('activity'),    color: '#34d399' },
+    sleepMinutes:       { label: 'Sleep Duration',      unit: 'min',  min: 0,   max: 600, icon: icon('moonSleep'),   color: '#818cf8' },
+    restlessnessScore:  { label: 'Restlessness',        unit: '',     min: 0,   max: 100, icon: icon('restless'),    color: '#f97316' },
+    pupilDilationMm:    { label: 'Pupil Dilation',      unit: 'mm',   min: 2,   max: 8,   icon: icon('eye'),         color: '#c084fc' },
+    socialScore:        { label: 'Social Interaction',   unit: '',     min: 0,   max: 100, icon: icon('users'),       color: '#22d3ee' },
+    routineDeviation:   { label: 'Routine Deviation',   unit: '',     min: 0,   max: 100, icon: icon('clipboard'),   color: '#fbbf24' },
+    cognitiveLoad:      { label: 'Cognitive Load',      unit: '',     min: 0,   max: 100, icon: icon('brain'),       color: '#a78bfa' },
+    sleepQuality:       { label: 'Sleep Quality',       unit: '',     min: 0,   max: 100, icon: icon('sleepQuality'),color: '#818cf8' },
+    circadianAlignment: { label: 'Circadian Alignment', unit: '',     min: 0,   max: 100, icon: icon('circadian'),   color: '#fbbf24' },
+    lightSpectrumScore: { label: 'Light Spectrum',      unit: '',     min: 0,   max: 100, icon: icon('spectrum'),    color: '#fde68a' },
+    greeneryExposureMin:{ label: 'Greenery Exposure',   unit: 'min',  min: 0,   max: 120, icon: icon('leaf'),        color: '#4ade80' },
+    natureSoundscapeScore:{ label: 'Nature Soundscape', unit: '',     min: 0,   max: 100, icon: icon('speaker'),     color: '#67e8f9' },
+    windowSimStatus:    { label: 'Window Simulation',   unit: '',     min: 0,   max: 100, icon: icon('windowSim'),   color: '#93c5fd' }
+};
+
+/* Sensor-to-module mapping: which sensors are in which module types */
+const MODULE_SENSORS = {
+    hub:         ['pupilDilationMm', 'cognitiveLoad'],
+    communal:    ['socialScore', 'routineDeviation'],
+    living:      ['sleepMinutes', 'restlessnessScore'],
+    research:    ['cognitiveLoad'],
+    cultivating: [],
+    mechanical:  ['heartRateBpm', 'hrvMs', 'edaMicrosiemens', 'skinTempC'],
+    containment: []
+};
+
+/* Sensor grouping for the System Monitoring legend (12 sensors, 4 systems) */
+const SENSOR_GROUPS = [
+    {
+        name: "NeurOptics' NPi-300 Pupillometer",
+        color: '#f472b6',
+        sensors: ['pupilDilationMm', 'cognitiveLoad']
+    },
+    {
+        name: 'Behavioral Pattern Analysis',
+        color: '#2dd4bf',
+        subtitle: 'Doorway motion sensors + workstation interactions',
+        sensors: ['socialScore', 'routineDeviation']
+    },
+    {
+        name: 'HRV Monitoring Wristband',
+        color: '#ef4444',
+        sensors: ['heartRateBpm', 'hrvMs', 'edaMicrosiemens', 'skinTempC', 'activityScore']
+    },
+    {
+        name: 'Sleeping Bag Pressure Sensors',
+        color: '#60a5fa',
+        sensors: ['sleepMinutes', 'restlessnessScore', 'sleepQuality']
+    }
+];
+
+const CIRCADIAN_PRESETS = {
+    0:  { sun: 0.05, ambient: 0.15, temp: 0x1a1a3a },   // midnight
+    6:  { sun: 0.3,  ambient: 0.3,  temp: 0xffa54f },   // dawn
+    12: { sun: 1.0,  ambient: 0.6,  temp: 0xffffff },   // noon
+    18: { sun: 0.35, ambient: 0.3,  temp: 0xff7b54 },   // dusk
+    24: { sun: 0.05, ambient: 0.15, temp: 0x1a1a3a }    // midnight wrap
+};
+
+/* ============================================
+   State
+   ============================================ */
+
+const state = {
+    scenario: 'baseline',
+    sample: null,
+    wellbeingIndex: 0,
+    wellbeingStatus: 'green',
+    missionTime: 12,        // 0–24 hours
+    viewMode: 'overview',   // overview | firstperson | rearrange
+    cutaway: false,
+    crewVisible: true,
+    privacyMode: false,
+    soundEnabled: false,
+    panelPreset: 'mixed',   // mixed | opaque | windows
+    playing: false,
+    playInterval: null,
+    layout: JSON.parse(JSON.stringify(DEFAULT_LAYOUT)),
+    // Three.js refs
+    habitatGroup: null,
+    crewGroup: null,
+    terrainMesh: null,
+    starField: null,
+    labels: [],
+    // Rearrange mode
+    dragModule: null,
+    dragPlane: new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
+    // Raycaster
+    raycaster: new THREE.Raycaster(),
+    mouse: new THREE.Vector2(),
+    // Hover state
+    hoveredObject: null,
+    // Camera fly-to animation
+    cameraFly: null,  // { from, to, target, progress, duration }
+    // Minimap throttle
+    minimapTimer: 0,
+    // Data refresh throttle
+    dataTimer: 0,
+    // Time series history
+    series: [],
+    // Active system highlight
+    highlightedSensor: null,
+    // Remove module mode
+    removeMode: false,
+    // Cached references for per-frame animation (avoids scene traversal)
+    _cached: { hotspots: [], holoRings: [], growLights: [], screens: [], particles: [], circadianFixtures: [], circadianLights: [], toggleAnims: [], doorScanLines: [], doorCornerNodes: [], slidingDoors: [], motionSensors: [], doorAssemblies: [], doorwayLEDs: [], animatedViewPanels: [] }
+};
+
+/* ============================================
+   Three.js Core Setup
+   ============================================ */
+
+// Guard: WebGL must be available before any Three.js setup runs.
+// If hardware acceleration is disabled this fails at module top-level —
+// the error handler in habitat-3d.html will surface a readable message.
+{
+    const _t = document.createElement('canvas');
+    if (!(_t.getContext('webgl2') || _t.getContext('webgl'))) {
+        const s = document.getElementById('loading-status');
+        const b = document.getElementById('loading-bar-fill');
+        if (s) s.textContent = 'WebGL unavailable — this page requires hardware acceleration. ' +
+            'In Chrome go to Settings → System → enable "Use hardware acceleration when available" and restart Chrome.';
+        if (b) { b.style.width = '100%'; b.style.background = '#ef4444'; }
+        throw new Error('WebGL not available — hardware acceleration appears to be disabled');
+    }
+}
+
+const canvas   = document.getElementById('habitat-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping        = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+renderer.shadowMap.enabled  = true;
+renderer.shadowMap.type     = THREE.PCFShadowMap;
+renderer.outputColorSpace   = THREE.SRGBColorSpace;
+
+const scene  = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0e17);
+scene.fog        = new THREE.FogExp2(0x0a0e17, 0.005);
+
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 600);
+camera.position.set(45, 35, 45);
+
+/* CSS2D label renderer */
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(window.innerWidth, window.innerHeight);
+labelRenderer.domElement.style.position = 'absolute';
+labelRenderer.domElement.style.top = '0';
+labelRenderer.domElement.style.pointerEvents = 'none';
+document.body.appendChild(labelRenderer.domElement);
+
+/* ============================================
+   Controls — Overview (Orbit) & First-Person (PointerLock)
+   ============================================ */
+
+const orbitControls = new OrbitControls(camera, renderer.domElement);
+orbitControls.enableDamping  = true;
+orbitControls.dampingFactor  = 0.08;
+orbitControls.minDistance     = 10;
+orbitControls.maxDistance     = 180;
+orbitControls.minPolarAngle  = Math.PI * 0.05;
+orbitControls.maxPolarAngle  = Math.PI * 0.48;
+orbitControls.target.set(0, 2, 0);
+
+const fpControls = new PointerLockControls(camera, renderer.domElement);
+fpControls.pointerSpeed = 0.5;
+const fpVelocity = new THREE.Vector3();
+const fpKeys = { forward: false, backward: false, left: false, right: false };
+
+/* ============================================
+   Lighting
+   ============================================ */
+
+// Ambient — soft fill
+const ambientLight = new THREE.AmbientLight(0x3b4a6b, 0.5);
+scene.add(ambientLight);
+
+// Sun — directional
+const sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
+sunLight.position.set(40, 60, 30);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width  = 1024;
+sunLight.shadow.mapSize.height = 1024;
+sunLight.shadow.camera.near = 1;
+sunLight.shadow.camera.far  = 150;
+sunLight.shadow.camera.left   = -50;
+sunLight.shadow.camera.right  = 50;
+sunLight.shadow.camera.top    = 50;
+sunLight.shadow.camera.bottom = -50;
+sunLight.shadow.bias = -0.001;
+scene.add(sunLight);
+
+// Hemisphere — sky/ground
+const hemiLight = new THREE.HemisphereLight(0x606080, 0x1a1a2e, 0.3);
+scene.add(hemiLight);
+
+// Earth-glow (subtle blue-green from Earth reflection)
+const earthGlow = new THREE.PointLight(0x4488cc, 0.3, 80);
+earthGlow.position.set(-20, 40, -20);
+scene.add(earthGlow);
+
+/* ============================================
+   Audio System
+   ============================================ */
+
+const audioListener = new THREE.AudioListener();
+camera.add(audioListener);
+
+/** Ambient habitat hum — synthesised low-frequency drone */
+let ambientHum = null;
+/** Positional nature sounds attached to window panels */
+const windowAudioSources = [];
+/** Short alert oscillator for status transitions */
+let alertOsc = null;
+let alertGain = null;
+/** Previous status for detecting transitions */
+let prevStatus = 'green';
+/** Shared audio buffer for nature loop (loaded once) */
+let natureBuffer = null;
+
+/**
+ * Initialise the audio system. Must be called after user gesture
+ * (triggered by the first sound-toggle click or play click).
+ */
+function initAudioSystem() {
+    if (ambientHum) return; // already initialised
+
+    const ctx = audioListener.context;
+
+    // --- Ambient hum (low drone) ---
+    ambientHum = new THREE.Audio(audioListener);
+    const humOsc = ctx.createOscillator();
+    humOsc.type = 'sine';
+    humOsc.frequency.value = 55; // A1 — deep hum
+    const humGain = ctx.createGain();
+    humGain.gain.value = 0;
+    // Add a second detuned oscillator for richness
+    const humOsc2 = ctx.createOscillator();
+    humOsc2.type = 'sine';
+    humOsc2.frequency.value = 82.5; // +fifth
+    const humGain2 = ctx.createGain();
+    humGain2.gain.value = 0;
+    humOsc.connect(humGain);
+    humOsc2.connect(humGain2);
+    humGain.connect(ambientHum.gain);
+    humGain2.connect(ambientHum.gain);
+    ambientHum.gain.connect(ctx.destination);
+    humOsc.start();
+    humOsc2.start();
+    ambientHum._humGain  = humGain;
+    ambientHum._humGain2 = humGain2;
+    ambientHum._targetVol = 0.07;
+
+    // --- Alert tone nodes (reusable) ---
+    alertGain = ctx.createGain();
+    alertGain.gain.value = 0;
+    alertGain.connect(ctx.destination);
+
+    // --- Load nature loop for window panels ---
+    const loader = new THREE.AudioLoader();
+    loader.load('../assets/audio/the_mountain-space-438391.mp3', buffer => {
+        natureBuffer = buffer;
+        attachWindowAudio();
+    }, undefined, () => {
+        console.warn('[Audio] Nature loop not loaded — skipping positional audio');
+    });
+}
+
+/** Attach PositionalAudio to every window panel currently in the scene. */
+function attachWindowAudio() {
+    if (!natureBuffer || !state.habitatGroup) return;
+
+    // Clean up existing
+    windowAudioSources.forEach(src => {
+        if (src.isPlaying) src.stop();
+        if (src.parent) src.parent.remove(src);
+    });
+    windowAudioSources.length = 0;
+
+    state.habitatGroup.traverse(child => {
+        if (child.userData.isOuterPanel && child.userData.panelType === 'window') {
+            const positional = new THREE.PositionalAudio(audioListener);
+            positional.setBuffer(natureBuffer);
+            positional.setLoop(true);
+            positional.setRefDistance(3);
+            positional.setMaxDistance(18);
+            positional.setVolume(0);
+            child.add(positional);
+            if (state.soundEnabled) {
+                positional.play();
+                positional.setVolume(0.35);
+            }
+            windowAudioSources.push(positional);
+        }
+    });
+}
+
+/** Play a short synthesised alert tone for status transitions. */
+function playAlertTone(status) {
+    if (!ambientHum) return; // audio not initialised
+    const ctx = audioListener.context;
+
+    // Create a short oscillator burst
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (status === 'red') {
+        osc.type = 'sawtooth';
+        osc.frequency.value = 440;
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.6);
+    } else if (status === 'yellow') {
+        osc.type = 'triangle';
+        osc.frequency.value = 330;
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.35);
+    } else {
+        // green — gentle chime
+        osc.type = 'sine';
+        osc.frequency.value = 523.25; // C5
+        gain.gain.setValueAtTime(0.06, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.25);
+    }
+}
+
+/**
+ * Per-frame audio update: modulate volumes by circadian time & sound toggle.
+ */
+function updateAudio() {
+    if (!ambientHum) return;
+
+    const masterOn = state.soundEnabled;
+    const hour = state.missionTime;
+
+    // Circadian volume curve: quieter at night (0-5h, 20-24h), louder during day
+    let circadianMul;
+    if (hour < 5)       circadianMul = 0.3;
+    else if (hour < 7)  circadianMul = 0.3 + 0.7 * ((hour - 5) / 2);
+    else if (hour < 18) circadianMul = 1.0;
+    else if (hour < 20) circadianMul = 1.0 - 0.7 * ((hour - 18) / 2);
+    else                circadianMul = 0.3;
+
+    // Ambient hum
+    const humTarget = masterOn ? ambientHum._targetVol * circadianMul : 0;
+    const g1 = ambientHum._humGain.gain;
+    const g2 = ambientHum._humGain2.gain;
+    // Smooth ramp
+    g1.value += (humTarget - g1.value) * 0.05;
+    g2.value += (humTarget * 0.5 - g2.value) * 0.05;
+
+    // Window panel positional audio
+    const winVol = masterOn ? 0.35 * circadianMul : 0;
+    for (const src of windowAudioSources) {
+        if (masterOn && !src.isPlaying && natureBuffer) {
+            src.play();
+        } else if (!masterOn && src.isPlaying) {
+            src.stop();
+        }
+        if (src.isPlaying) {
+            src.setVolume(src.getVolume() + (winVol - src.getVolume()) * 0.05);
+        }
+    }
+
+    // Status alert: detect transitions
+    if (state.wellbeingStatus !== prevStatus) {
+        if (masterOn) playAlertTone(state.wellbeingStatus);
+        prevStatus = state.wellbeingStatus;
+    }
+}
+
+/* ============================================
+   Post-Processing (Bloom)
+   ============================================ */
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+
+const bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    0.35,   // strength — soft glow
+    0.6,    // radius
+    0.78    // threshold — only bright emissives bloom
+);
+composer.addPass(bloomPass);
+
+/* ============================================
+   Status-Reactive Environment
+   ============================================ */
+
+let statusWarningMeshes = [];
+let prevEnvironmentStatus = 'green';
+
+/**
+ * React to wellbeing status changes — tint ambient light, pulse base rims.
+ */
+function updateStatusEnvironment() {
+    const status = state.wellbeingStatus;
+    if (status === prevEnvironmentStatus) return;
+    prevEnvironmentStatus = status;
+
+    // Ambient light tint
+    switch (status) {
+        case 'green':
+            ambientLight.color.set(0x3b4a6b);
+            ambientLight.intensity = 0.5;
+            bloomPass.strength = 0.35;
+            break;
+        case 'yellow':
+            ambientLight.color.set(0x4a4a5b);
+            ambientLight.intensity = 0.55;
+            bloomPass.strength = 0.4;
+            break;
+        case 'red':
+            ambientLight.color.set(0x5b3b3b);
+            ambientLight.intensity = 0.6;
+            bloomPass.strength = 0.5;
+            break;
+    }
+
+    // Clean up old warning meshes
+    statusWarningMeshes.forEach(m => {
+        if (m.parent) m.parent.remove(m);
+        m.geometry.dispose();
+        m.material.dispose();
+    });
+    statusWarningMeshes = [];
+
+    if (!state.habitatGroup) return;
+
+    // Add warning indicators on corridor walls (yellow = amber, red = red)
+    if (status === 'yellow' || status === 'red') {
+        const warnColor = status === 'red' ? 0xef4444 : 0xf59e0b;
+        const warnIntensity = status === 'red' ? 0.8 : 0.5;
+        const dotGeo = new THREE.SphereGeometry(0.15, 6, 6);
+        const dotMat = new THREE.MeshStandardMaterial({
+            color: warnColor,
+            emissive: warnColor,
+            emissiveIntensity: warnIntensity
+        });
+
+        // Place dots along corridors
+        state.habitatGroup.traverse(child => {
+            if (child.userData.isCorridor) {
+                const pos = child.position;
+                for (let side = -1; side <= 1; side += 2) {
+                    const dot = new THREE.Mesh(dotGeo, dotMat);
+                    dot.position.set(pos.x, 1.2, pos.z + side * 1.5);
+                    state.habitatGroup.add(dot);
+                    statusWarningMeshes.push(dot);
+                }
+            }
+        });
+
+        dotGeo.dispose(); // shared geo cloned by mesh internals — actually reused, keep ref
+    }
+}
+
+/**
+ * Per-frame pulse for status warning dots when status is red.
+ */
+function pulseStatusWarnings(elapsed) {
+    if (state.wellbeingStatus !== 'red' || statusWarningMeshes.length === 0) return;
+    const intensity = 0.5 + Math.sin(elapsed * 4) * 0.3;
+    for (const dot of statusWarningMeshes) {
+        dot.material.emissiveIntensity = intensity;
+    }
+}
+
+/* ============================================
+   Lunar Terrain
+   ============================================ */
+
+function createTerrain() {
+    const size = 200;
+    const segments = 64;
+    const geo = new THREE.PlaneGeometry(size, size, segments, segments);
+    geo.rotateX(-Math.PI / 2);
+
+    // Displace vertices with layered noise for craters + rolling hills
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const z = pos.getZ(i);
+        let h = 0;
+        // Large gentle hills
+        h += Math.sin(x * 0.03) * Math.cos(z * 0.03) * 2.5;
+        // Medium ridges
+        h += Math.sin(x * 0.08 + 1.3) * Math.cos(z * 0.06 + 0.7) * 1.2;
+        // Small bumps
+        h += Math.sin(x * 0.25 + 3.1) * Math.cos(z * 0.2 + 2.4) * 0.4;
+        // Crater-like depressions
+        const cx = x - 5, cz = z + 3;
+        const craterDist = Math.sqrt(cx * cx + cz * cz);
+        if (craterDist < 18) {
+            h -= Math.max(0, (18 - craterDist) * 0.12) * Math.cos(craterDist * 0.25);
+        }
+        // Flatten center area for habitat
+        const centerDist = Math.sqrt(x * x + z * z);
+        const flatRadius = 20;
+        if (centerDist < flatRadius) {
+            const blendFactor = centerDist / flatRadius;
+            h *= blendFactor * blendFactor;
+        }
+        pos.setY(i, h);
+    }
+    geo.computeVertexNormals();
+
+    const mat = new THREE.MeshStandardMaterial({
+        color: 0x8a8a8a,
+        roughness: 0.95,
+        metalness: 0.0,
+        flatShading: true
+    });
+
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.receiveShadow = true;
+    mesh.position.y = -0.5;
+    return mesh;
+}
+
+/* ============================================
+   Starfield
+   ============================================ */
+
+function createStarfield() {
+    const count = 2000;
+    const positions = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+
+    for (let i = 0; i < count; i++) {
+        // Distribute on a large sphere
+        const theta = Math.random() * Math.PI * 2;
+        const phi   = Math.acos(2 * Math.random() - 1);
+        const r     = 180 + Math.random() * 60;
+        positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
+        positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+        positions[i * 3 + 2] = r * Math.cos(phi);
+        sizes[i] = 0.3 + Math.random() * 1.2;
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+    const mat = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 0.5,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.8
+    });
+
+    return new THREE.Points(geo, mat);
+}
+
+/* ============================================
+   Earth (distant sphere in sky)
+   ============================================ */
+
+function createEarth() {
+    const geo = new THREE.SphereGeometry(6, 16, 16);
+    const mat = new THREE.MeshStandardMaterial({
+        color: 0x4488cc,
+        emissive: 0x224466,
+        emissiveIntensity: 0.4,
+        roughness: 0.6,
+        metalness: 0.1
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(-60, 70, -80);
+    return mesh;
+}
+
+/* ============================================
+   Circadian Lighting
+   ============================================ */
+
+function updateCircadianLighting(hour) {
+    // Interpolate between preset keyframes
+    const keys = Object.keys(CIRCADIAN_PRESETS).map(Number).sort((a, b) => a - b);
+    let lo = keys[0], hi = keys[1];
+    for (let i = 0; i < keys.length - 1; i++) {
+        if (hour >= keys[i] && hour <= keys[i + 1]) {
+            lo = keys[i];
+            hi = keys[i + 1];
+            break;
+        }
+    }
+
+    const t = hi === lo ? 0 : (hour - lo) / (hi - lo);
+    const a = CIRCADIAN_PRESETS[lo];
+    const b = CIRCADIAN_PRESETS[hi];
+
+    sunLight.intensity     = THREE.MathUtils.lerp(a.sun, b.sun, t);
+    ambientLight.intensity = THREE.MathUtils.lerp(a.ambient, b.ambient, t);
+
+    const colorA = new THREE.Color(a.temp);
+    const colorB = new THREE.Color(b.temp);
+    sunLight.color.copy(colorA).lerp(colorB, t);
+
+    // Update scene fog to match ambient
+    const fogDarkness = THREE.MathUtils.lerp(0.008, 0.003, sunLight.intensity);
+    scene.fog.density = fogDarkness;
+}
+
+/* ============================================
+   Crew Members
+   ============================================ */
+
+function createCrewMember(position, color) {
+    const group = new THREE.Group();
+    group.position.copy(position);
+
+    // Body (capsule)
+    const bodyGeo = new THREE.CapsuleGeometry(0.25, 0.8, 8, 12);
+    const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.2 });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = 0.65;
+    body.castShadow = true;
+    group.add(body);
+
+    // Head
+    const headGeo = new THREE.SphereGeometry(0.18, 12, 12);
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xddccbb, roughness: 0.5, metalness: 0.1 });
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.position.y = 1.3;
+    head.castShadow = true;
+    group.add(head);
+
+    // Visor
+    const visorGeo = new THREE.SphereGeometry(0.12, 8, 8, 0, Math.PI);
+    const visorMat = new THREE.MeshPhysicalMaterial({
+        color: 0x38bdf8,
+        roughness: 0.05,
+        metalness: 0.8,
+        transmission: 0.4,
+        thickness: 0.1
+    });
+    const visor = new THREE.Mesh(visorGeo, visorMat);
+    visor.position.set(0, 1.32, 0.1);
+    visor.rotation.x = -Math.PI / 6;
+    group.add(visor);
+
+    // Label
+    const labelDiv = document.createElement('div');
+    labelDiv.className = 'label-2d';
+    labelDiv.textContent = 'Crew';
+    const label = new CSS2DObject(labelDiv);
+    label.position.set(0, 1.7, 0);
+    group.add(label);
+
+    group.userData.isCrewMember = true;
+    return group;
+}
+
+function createCrewGroup() {
+    const group = new THREE.Group();
+    const crewDefs = [
+        { name: 'Cmdr. Vasquez',  color: 0x38bdf8, module: 'hub' },
+        { name: 'Dr. Chen',       color: 0x22c55e, module: 'research' },
+        { name: 'Eng. Okafor',    color: 0xf59e0b, module: 'mechanical' },
+        { name: 'Med. Larsen',    color: 0xa78bfa, module: 'living' }
+    ];
+
+    // Find module positions from layout
+    crewDefs.forEach((def, i) => {
+        const layoutEntry = state.layout.find(m => m.type === def.module);
+        const pos = layoutEntry
+            ? new THREE.Vector3(layoutEntry.x + (i % 2) * 1.5 - 0.75, 0, layoutEntry.z + Math.floor(i / 2) * 1.5 - 0.75)
+            : new THREE.Vector3(i * 3 - 4, 0, 0);
+
+        const member = createCrewMember(pos, def.color);
+        member.userData.crewId = i;
+        member.userData.crewName = def.name;
+        labelDiv(member, def.name);
+        group.add(member);
+    });
+    return group;
+}
+
+function labelDiv(member, text) {
+    // Update the label text on the crew member
+    member.traverse(child => {
+        if (child instanceof CSS2DObject) {
+            child.element.textContent = text;
+        }
+    });
+}
+
+/* ============================================
+   Wellbeing Badge
+   ============================================ */
+
+function updateWellbeingBadge() {
+    const badge = document.getElementById('wellbeing-badge');
+    if (!badge) return;
+
+    const idx = state.privacyMode ? 0 : state.wellbeingIndex;
+    const statusLabel = state.privacyMode ? 'PRIVATE' : state.wellbeingStatus.toUpperCase();
+    const colorMap = { green: '#4ade80', yellow: '#facc15', red: '#f87171' };
+    const arcColor = state.privacyMode ? '#64748b' : (colorMap[state.wellbeingStatus] || '#64748b');
+
+    // SVG arc — 0-100 mapped to 0-270 degrees
+    const radius = 22;
+    const circumference = 2 * Math.PI * radius;
+    const arcLength = (270 / 360) * circumference;  // total arc length for 270°
+    const filled = (idx / 100) * arcLength;
+    const gap = arcLength - filled;
+
+    badge.innerHTML = `
+        <svg class="wb-gauge" width="60" height="60" viewBox="0 0 60 60">
+            <circle cx="30" cy="30" r="${radius}" fill="none" stroke="rgba(148,163,184,0.15)" stroke-width="4"
+                stroke-dasharray="${arcLength} ${circumference - arcLength}"
+                stroke-dashoffset="0" stroke-linecap="round"
+                transform="rotate(135 30 30)" />
+            <circle cx="30" cy="30" r="${radius}" fill="none" stroke="${arcColor}" stroke-width="4"
+                stroke-dasharray="${filled} ${circumference - filled}"
+                stroke-dashoffset="0" stroke-linecap="round"
+                transform="rotate(135 30 30)"
+                style="transition: stroke-dasharray 0.5s ease, stroke 0.5s ease" />
+            <text x="30" y="33" text-anchor="middle" fill="${arcColor}" font-size="14" font-weight="700"
+                font-family="var(--font-mono, 'JetBrains Mono', monospace)">${state.privacyMode ? '—' : idx}</text>
+        </svg>
+        <div class="wb-info">
+            <span class="wb-label">Wellbeing</span>
+            <span class="wb-status ${state.wellbeingStatus}">${statusLabel}</span>
+        </div>
+    `;
+}
+
+/* ============================================
+   HUD & Controls Binding
+   ============================================ */
+
+function initHUD() {
+    // Scenario select (with sessionStorage persistence)
+    const scenarioSelect = document.getElementById('scenario-select-habitat');
+    if (scenarioSelect) {
+        const saved = sessionStorage.getItem('lunarHabitatScenario');
+        if (saved && scenarioSelect.querySelector(`option[value="${CSS.escape(saved)}"]`)) {
+            state.scenario = saved;
+        }
+        scenarioSelect.value = state.scenario;
+        scenarioSelect.addEventListener('change', () => {
+            state.scenario = scenarioSelect.value;
+            sessionStorage.setItem('lunarHabitatScenario', state.scenario);
+            refreshData();
+        });
+    }
+
+    // Play / Pause
+    const playBtn = document.getElementById('btn-play-pause');
+    if (playBtn) {
+        playBtn.addEventListener('click', () => {
+            state.playing = !state.playing;
+            playBtn.innerHTML = state.playing
+                ? icon('pause', 'sm') + ' Pause'
+                : icon('play', 'sm') + ' Play';
+            if (state.playing) {
+                // Init audio on user gesture if sound is enabled
+                if (state.soundEnabled) {
+                    if (audioListener.context.state === 'suspended') audioListener.context.resume();
+                    initAudioSystem();
+                }
+                state.playInterval = setInterval(() => {
+                    state.missionTime = (state.missionTime + 0.5) % 24;
+                    document.getElementById('mission-time').value = state.missionTime;
+                    updateTimeDisplay();
+                    updateCircadianLighting(state.missionTime);
+                    updateCircadianFixtures(state.missionTime);
+                    refreshData();
+                }, 2000);
+            } else {
+                clearInterval(state.playInterval);
+            }
+        });
+    }
+
+    // Privacy toggle
+    const privacyBtn = document.getElementById('btn-privacy');
+    if (privacyBtn) {
+        privacyBtn.addEventListener('click', () => {
+            state.privacyMode = !state.privacyMode;
+            privacyBtn.setAttribute('aria-pressed', state.privacyMode);
+            privacyBtn.innerHTML = state.privacyMode ? icon('lock', 'sm') + ' Privacy' : icon('unlock', 'sm') + ' Privacy';
+            updateWellbeingBadge();
+        });
+    }
+
+    // Cutaway toggle
+    const cutawayBtn = document.getElementById('btn-cutaway');
+    if (cutawayBtn) {
+        cutawayBtn.addEventListener('click', () => {
+            state.cutaway = !state.cutaway;
+            cutawayBtn.setAttribute('aria-pressed', state.cutaway);
+            applyCutaway();
+        });
+    }
+
+    // Sound toggle — initialise audio system on first enable (needs user gesture)
+    const soundBtn = document.getElementById('btn-sound');
+    if (soundBtn) {
+        soundBtn.addEventListener('click', () => {
+            state.soundEnabled = !state.soundEnabled;
+            soundBtn.setAttribute('aria-pressed', state.soundEnabled);
+            soundBtn.innerHTML = state.soundEnabled ? icon('volumeOn', 'sm') + ' Sound' : icon('volumeOff', 'sm') + ' Sound';
+            if (state.soundEnabled) {
+                // Resume AudioContext if suspended (autoplay policy)
+                if (audioListener.context.state === 'suspended') {
+                    audioListener.context.resume();
+                }
+                initAudioSystem();
+            }
+        });
+    }
+
+    // Guided tour
+    const tourBtn = document.getElementById('btn-tour');
+    if (tourBtn) {
+        tourBtn.addEventListener('click', () => {
+            if (tourActive) { stopTour(); } else { startGuidedTour(); }
+        });
+    }
+    const tourSkip = document.getElementById('tour-skip');
+    if (tourSkip) {
+        tourSkip.addEventListener('click', stopTour);
+    }
+    const tourBack = document.getElementById('tour-back');
+    if (tourBack) {
+        tourBack.addEventListener('click', prevTourStep);
+    }
+    const tourNext = document.getElementById('tour-next');
+    if (tourNext) {
+        tourNext.addEventListener('click', nextTourStep);
+    }
+    document.addEventListener('keydown', (e) => {
+        if (!tourActive) return;
+        if (e.key === 'ArrowRight') { e.preventDefault(); nextTourStep(); }
+        else if (e.key === 'ArrowLeft') { e.preventDefault(); prevTourStep(); }
+        else if (e.key === 'Escape') { e.preventDefault(); stopTour(); }
+    });
+
+    // View modes
+    document.querySelectorAll('.hud-mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.hud-mode-btn').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-checked', 'false');
+            });
+            btn.classList.add('active');
+            btn.setAttribute('aria-checked', 'true');
+            switchViewMode(btn.dataset.mode);
+        });
+    });
+
+    // Panel presets
+    document.querySelectorAll('.hud-preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.hud-preset-btn').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-checked', 'false');
+            });
+            btn.classList.add('active');
+            btn.setAttribute('aria-checked', 'true');
+            state.panelPreset = btn.dataset.preset;
+            applyPanelPreset(state.panelPreset);
+        });
+    });
+
+    // Mission time slider
+    const timeSlider = document.getElementById('mission-time');
+    if (timeSlider) {
+        timeSlider.addEventListener('input', () => {
+            state.missionTime = parseFloat(timeSlider.value);
+            updateTimeDisplay();
+            updateCircadianLighting(state.missionTime);
+            updateCircadianFixtures(state.missionTime);
+        });
+    }
+
+    // Close side panels
+    document.getElementById('sensor-panel-close')?.addEventListener('click', () => {
+        document.getElementById('sensor-panel')?.classList.remove('open');
+        clearHighlight();
+    });
+    document.getElementById('module-panel-close')?.addEventListener('click', () => {
+        document.getElementById('module-panel')?.classList.remove('open');
+    });
+
+    // Rearrange done
+    document.getElementById('btn-rearrange-done')?.addEventListener('click', () => {
+        state.removeMode = false;
+        document.getElementById('btn-remove-module')?.classList.remove('active');
+        document.getElementById('module-picker')?.setAttribute('hidden', '');
+        switchViewMode('overview');
+        document.querySelectorAll('.hud-mode-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.mode === 'overview');
+        });
+    });
+
+    // Populate the rearrange-mode picker grid from SECONDARY_SPECIALIZATIONS
+    const pickerGrid = document.querySelector('#module-picker .module-picker-grid');
+    if (pickerGrid) {
+        pickerGrid.innerHTML = SECONDARY_SPECIALIZATIONS.map(s => `
+            <button class="module-pick-btn" data-spec-id="${s.id}" aria-label="Add ${s.name} module">
+                <span class="module-pick-dot" style="background:#${s.color.toString(16).padStart(6, '0')}"></span>
+                <span class="module-pick-text">
+                    <strong>${s.name}</strong>
+                    <span class="module-pick-desc">${s.description}</span>
+                </span>
+            </button>
+        `).join('');
+    }
+
+    // Add Module — show/hide picker
+    document.getElementById('btn-add-module')?.addEventListener('click', () => {
+        const picker = document.getElementById('module-picker');
+        if (picker) picker.hidden = !picker.hidden;
+        state.removeMode = false;
+        document.getElementById('btn-remove-module')?.classList.remove('active');
+        canvas.style.cursor = '';
+    });
+
+    // Module picker buttons
+    document.querySelectorAll('.module-pick-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const specId = btn.dataset.specId;
+            const spec = SECONDARY_SPECIALIZATIONS.find(s => s.id === specId);
+            if (spec) addModule(spec.moduleType, spec);
+            document.getElementById('module-picker')?.setAttribute('hidden', '');
+        });
+    });
+
+    // Remove Module — toggle removal mode
+    document.getElementById('btn-remove-module')?.addEventListener('click', () => {
+        state.removeMode = !state.removeMode;
+        const btn = document.getElementById('btn-remove-module');
+        if (btn) btn.classList.toggle('active', state.removeMode);
+        document.getElementById('module-picker')?.setAttribute('hidden', '');
+        canvas.style.cursor = state.removeMode ? 'crosshair' : '';
+        announce(state.removeMode ? 'Click a module to remove it.' : 'Removal mode off.');
+    });
+
+    updateTimeDisplay();
+}
+
+function updateTimeDisplay() {
+    const display = document.getElementById('mission-time-display');
+    const phaseEl = document.getElementById('circadian-phase');
+    const t = state.missionTime;
+    if (display) {
+        const h = Math.floor(t);
+        const m = Math.round((t - h) * 60);
+        display.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+    if (phaseEl) {
+        let label, color;
+        if (t >= 6 && t < 10)       { label = 'Dawn';  color = '#fb923c'; }
+        else if (t >= 10 && t < 18) { label = 'Day';   color = '#facc15'; }
+        else if (t >= 18 && t < 21) { label = 'Dusk';  color = '#f472b6'; }
+        else                        { label = 'Night'; color = '#818cf8'; }
+        phaseEl.textContent = label;
+        phaseEl.style.color = color;
+    }
+}
+
+/* ============================================
+   Guided Tour
+   ============================================ */
+
+const TOUR_WAYPOINTS = [
+    {
+        position: [55, 40, 55],
+        target:   [0, 3, 0],
+        duration: 5,
+        title:    'Welcome to the ASCEND Habitat',
+        text:     'A modular lunar habitat designed for long-duration crew wellbeing monitoring. At 1/6th Earth gravity, the Moon\'s microgravity environment changes how crew move, sleep, and maintain health — this system tracks those adaptations in real time.'
+    },
+    {
+        position: [12, 8, 12],
+        target:   [0, 3, 0],
+        title:    'Central Hub',
+        duration: 5,
+        text:     "The social heart of the habitat. In lunar microgravity, crew move with a bounding low-g gait — the central anchor post and perimeter handrails help control momentum and stabilise during interaction. NeurOptics' NPi-300 Pupillometer monitors pupil dilation and cognitive load in the common area."
+    },
+    {
+        position: [26, 7, 4],
+        target:   [20, 3, 0],
+        duration: 5,
+        title:    'Secondary Module',
+        text:     ''
+    },
+    {
+        position: [-26, 7, -4],
+        target:   [-20, 3, 0],
+        duration: 5,
+        title:    'Secondary Module',
+        text:     ''
+    },
+    {
+        position: [4, 7, 26],
+        target:   [0, 3, 20],
+        duration: 5,
+        title:    'Secondary Module',
+        text:     ''
+    },
+    {
+        position: [-4, 7, -26],
+        target:   [0, 3, -20],
+        duration: 5,
+        title:    'Secondary Module',
+        text:     ''
+    },
+    {
+        position: [21, 7, 19],
+        target:   [15, 3, 15],
+        duration: 5,
+        title:    'Secondary Module',
+        text:     ''
+    },
+    {
+        position: [-21, 7, 19],
+        target:   [-15, 3, 15],
+        duration: 5,
+        title:    'Secondary Module',
+        text:     ''
+    },
+    {
+        position: [0, 16, 40],
+        target:   [0, 3, 0],
+        duration: 4,
+        title:    'LED Circadian Lighting',
+        text:     'Every module shares a unified LED Circadian Lighting system. Ceiling fixtures shift from warm dawn tones to cool daylight and dim evening hues, following mission time.'
+    },
+    {
+        position: [50, 40, 50],
+        target:   [0, 3, 0],
+        duration: 4,
+        title:    'Explore Freely',
+        text:     'Tour complete! Click sensors to inspect metrics, swap panels between opaque and window, toggle cutaway mode, or walk through in first-person view.'
+    }
+];
+
+let tourIndex = -1;
+let tourActive = false;
+
+function startGuidedTour() {
+    if (tourActive) return;
+    tourActive = true;
+    tourIndex = -1;
+
+    orbitControls.enabled = false;
+    if (fpControls.isLocked) fpControls.unlock();
+    state.cameraFly = null;
+
+    const card = document.getElementById('tour-card');
+    if (card) card.hidden = false;
+
+    announce('Guided tour started. Use Next and Back to navigate, Skip to exit.');
+    goToTourStep(0);
+}
+
+function goToTourStep(index) {
+    if (index < 0 || index >= TOUR_WAYPOINTS.length) return;
+    tourIndex = index;
+    const wp = TOUR_WAYPOINTS[tourIndex];
+
+    state.cameraFly = {
+        from:       camera.position.clone(),
+        to:         new THREE.Vector3(...wp.position),
+        targetFrom: orbitControls.target.clone(),
+        targetTo:   new THREE.Vector3(...wp.target),
+        progress:   0,
+        duration:   window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0.01 : 1.2
+    };
+
+    const titleEl = document.getElementById('tour-card-title');
+    const textEl  = document.getElementById('tour-card-text');
+    const stepEl  = document.getElementById('tour-card-step');
+    const backBtn = document.getElementById('tour-back');
+    const nextBtn = document.getElementById('tour-next');
+    if (titleEl) titleEl.textContent = wp.title;
+    if (textEl)  textEl.textContent  = wp.text;
+    if (stepEl)  stepEl.textContent  = `${tourIndex + 1} / ${TOUR_WAYPOINTS.length}`;
+    if (backBtn) backBtn.disabled = tourIndex === 0;
+    if (nextBtn) nextBtn.textContent = tourIndex === TOUR_WAYPOINTS.length - 1 ? 'Finish' : 'Next →';
+
+    announce(`${wp.title}. ${wp.text}`);
+}
+
+function nextTourStep() {
+    if (!tourActive) return;
+    if (tourIndex >= TOUR_WAYPOINTS.length - 1) {
+        stopTour();
+        return;
+    }
+    goToTourStep(tourIndex + 1);
+}
+
+function prevTourStep() {
+    if (!tourActive || tourIndex <= 0) return;
+    goToTourStep(tourIndex - 1);
+}
+
+function stopTour() {
+    tourActive = false;
+    tourIndex  = -1;
+
+    const card = document.getElementById('tour-card');
+    if (card) card.hidden = true;
+
+    orbitControls.enabled = true;
+    camera.position.set(30, 25, 30);
+    orbitControls.target.set(0, 2, 0);
+    state.viewMode = 'overview';
+
+    document.querySelectorAll('.hud-mode-btn').forEach(b => b.classList.remove('active'));
+    const overviewBtn = document.querySelector('.hud-mode-btn[data-mode="overview"]');
+    if (overviewBtn) overviewBtn.classList.add('active');
+
+    announce('Tour ended. You are in overview mode.');
+}
+
+/* ============================================
+   View Mode Switching
+   ============================================ */
+
+function switchViewMode(mode) {
+    // Stop tour if user switches modes manually
+    if (tourActive) stopTour();
+
+    state.viewMode = mode;
+
+    const rearrangeToolbar = document.getElementById('rearrange-toolbar');
+
+    // Cleanup previous mode
+    if (fpControls.isLocked) fpControls.unlock();
+    orbitControls.enabled = false;
+    if (rearrangeToolbar) rearrangeToolbar.hidden = true;
+    state.removeMode = false;
+    document.getElementById('btn-remove-module')?.classList.remove('active');
+    document.getElementById('module-picker')?.setAttribute('hidden', '');
+    canvas.style.cursor = '';
+
+    switch (mode) {
+        case 'overview':
+            orbitControls.enabled = true;
+            camera.position.set(30, 25, 30);
+            orbitControls.target.set(0, 2, 0);
+            break;
+        case 'firstperson':
+            camera.position.set(0, 1.85, 0);
+            camera.lookAt(1, 1.85, 0);
+            fpControls.lock();
+            announce('First-person mode. WASD to move, mouse to look. ESC to exit.');
+            break;
+        case 'rearrange':
+            orbitControls.enabled = true;
+            camera.position.set(0, 40, 0.1);
+            orbitControls.target.set(0, 0, 0);
+            orbitControls.minPolarAngle = 0;
+            orbitControls.maxPolarAngle = Math.PI * 0.3;
+            if (rearrangeToolbar) rearrangeToolbar.hidden = false;
+            announce('Rearrangement mode. Drag modules to reposition.');
+            break;
+    }
+
+    applyHandrailVisibility();
+}
+
+/* ============================================
+   Cutaway & Panel Presets
+   ============================================ */
+
+function applyCutaway() {
+    if (!state.habitatGroup) return;
+    state.habitatGroup.traverse(child => {
+        if (child.userData.isOuterPanel) {
+            child.material.opacity  = state.cutaway ? 0.15 : child.userData.defaultOpacity;
+            child.material.transparent = true;
+            child.material.needsUpdate = true;
+        }
+    });
+    applyHandrailVisibility();
+}
+
+function applyHandrailVisibility() {
+    if (!state.habitatGroup) return;
+    const showRails = state.viewMode === 'firstperson' || state.cutaway;
+    state.habitatGroup.traverse(child => {
+        if (child.userData.isHandrail) {
+            child.visible = showRails;
+        }
+    });
+}
+
+function applyPanelPreset(preset) {
+    if (!state.habitatGroup) return;
+    state.habitatGroup.traverse(child => {
+        if (child.userData.isOuterPanel && child.userData.swappable) {
+            switch (preset) {
+                case 'opaque':
+                    child.material.color.set(0xf0f0f0);
+                    child.material.transmission = 0;
+                    child.material.opacity = 1.0;
+                    child.userData.defaultOpacity = 1.0;
+                    child.userData.panelType = 'opaque';
+                    break;
+                case 'windows':
+                    child.material.color.set(0x88ccff);
+                    child.material.transmission = 0.6;
+                    child.material.opacity = 0.3;
+                    child.userData.defaultOpacity = 0.3;
+                    child.userData.panelType = 'window';
+                    break;
+                case 'mixed':
+                    // Restore original
+                    const isWindow = child.userData.originalPanelType === 'window';
+                    child.material.color.set(isWindow ? 0x88ccff : 0xf0f0f0);
+                    child.material.transmission = isWindow ? 0.6 : 0;
+                    child.material.opacity = isWindow ? 0.3 : 1.0;
+                    child.userData.defaultOpacity = isWindow ? 0.3 : 1.0;
+                    child.userData.panelType = child.userData.originalPanelType;
+                    break;
+            }
+            if (state.cutaway) {
+                child.material.opacity = 0.15;
+            }
+            child.material.needsUpdate = true;
+        }
+    });
+}
+
+/* ============================================
+   Data Refresh
+   ============================================ */
+
+function refreshData() {
+    state.sample          = getCurrentSample(state.scenario);
+    state.wellbeingIndex  = computeWellbeingIndex(state.sample);
+    state.wellbeingStatus = computeStatus(state.wellbeingIndex);
+    // Generate time-series (keep last 30 points for sparklines)
+    if (state.series.length === 0) {
+        state.series = generateSeries(state.scenario, 30);
+    } else {
+        const newPoint = getCurrentSample(state.scenario);
+        newPoint.timestamp = Date.now();
+        state.series.push(newPoint);
+        if (state.series.length > 30) state.series.shift();
+    }
+    updateWellbeingBadge();
+    updateStatusEnvironment();
+}
+
+/**
+ * Build a tiny SVG sparkline from recent series data for a given metric.
+ */
+function buildSparkline(metricKey, width = 100, height = 24) {
+    const series = state.series;
+    if (!series || series.length < 2) return '';
+
+    const meta = METRIC_META[metricKey];
+    if (!meta) return '';
+
+    const values = series.map(s => s[metricKey] ?? 0);
+    const min = meta.min;
+    const max = meta.max;
+    const range = max - min || 1;
+
+    const points = values.map((v, i) => {
+        const x = (i / (values.length - 1)) * width;
+        const y = height - ((v - min) / range) * height;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+
+    return `<svg class="sparkline" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+        <polyline fill="none" stroke="${meta.color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="${points}" opacity="0.8" />
+    </svg>`;
+}
+
+/**
+ * Get a status class for a metric value within its range.
+ */
+function metricStatus(metricKey, value) {
+    const meta = METRIC_META[metricKey];
+    if (!meta) return 'green';
+    const pct = (value - meta.min) / (meta.max - meta.min);
+    // For most metrics, mid-range is good; extremes are bad
+    // Exceptions: HRV and sleep quality where higher is better
+    const higherIsBetter = ['hrvMs', 'socialScore', 'sleepQuality', 'circadianAlignment',
+        'lightSpectrumScore', 'greeneryExposureMin', 'natureSoundscapeScore', 'windowSimStatus'];
+    const lowerIsBetter = ['edaMicrosiemens', 'restlessnessScore',
+        'routineDeviation', 'cognitiveLoad'];
+
+    if (higherIsBetter.includes(metricKey)) {
+        return pct > 0.6 ? 'green' : pct > 0.3 ? 'yellow' : 'red';
+    } else if (lowerIsBetter.includes(metricKey)) {
+        return pct < 0.4 ? 'green' : pct < 0.7 ? 'yellow' : 'red';
+    }
+    // Default: mid-range is best (e.g., heart rate)
+    return (pct > 0.2 && pct < 0.7) ? 'green' : (pct > 0.1 && pct < 0.85) ? 'yellow' : 'red';
+}
+
+/* ============================================
+   System Highlighting
+   ============================================ */
+
+/**
+ * Highlight all hotspots matching the given sensorId across the habitat.
+ * Non-matching hotspots dim. Call clearHighlight() to reset.
+ */
+function highlightSystem(sensorId) {
+    state.highlightedSensor = sensorId;
+    const hotspots = state._cached.hotspots;
+    for (let i = 0, len = hotspots.length; i < len; i++) {
+        const h = hotspots[i];
+        if (h.userData.sensorId === sensorId) {
+            h.scale.setScalar(1.8);
+            h.material.emissiveIntensity = 1.0;
+            h.material.opacity = 1.0;
+            h.userData._highlighted = true;
+        } else {
+            h.material.emissiveIntensity = 0.1;
+            h.material.opacity = 0.25;
+            h.userData._highlighted = false;
+        }
+    }
+}
+
+function clearHighlight() {
+    state.highlightedSensor = null;
+    const hotspots = state._cached.hotspots;
+    for (let i = 0, len = hotspots.length; i < len; i++) {
+        const h = hotspots[i];
+        h.scale.setScalar(1.0);
+        h.material.emissiveIntensity = 0.6;
+        h.material.opacity = 1.0;
+        delete h.userData._highlighted;
+    }
+}
+
+/* ============================================
+   Raycasting / Click Interactions
+   ============================================ */
+
+const VIEW_CYCLE = ['regular', 'earth', 'forest', 'ocean', 'mountain', 'aurora', 'opaque'];
+
+function cyclePanelView(panel) {
+    const current = panel.userData.viewOption
+        ?? (panel.userData.panelType === 'window' ? 'regular' : 'opaque');
+    const idx = VIEW_CYCLE.indexOf(current);
+    const next = VIEW_CYCLE[(idx + 1) % VIEW_CYCLE.length];
+    applyViewToPanel(panel, next);
+}
+
+function onCanvasClick(event) {
+    const rect = canvas.getBoundingClientRect();
+    const fpClick = state.viewMode === 'firstperson' && fpControls.isLocked;
+    if (fpClick) {
+        // Pointer is locked — raycast from screen center (where the camera looks).
+        state.mouse.x = 0;
+        state.mouse.y = 0;
+    } else {
+        state.mouse.x =  ((event.clientX - rect.left) / rect.width)  * 2 - 1;
+        state.mouse.y = -((event.clientY - rect.top)  / rect.height) * 2 + 1;
+    }
+
+    state.raycaster.setFromCamera(state.mouse, camera);
+
+    if (!state.habitatGroup) return;
+    const intersects = state.raycaster.intersectObjects(state.habitatGroup.children, true);
+
+    for (const hit of intersects) {
+        const obj = hit.object;
+
+        if (obj.userData.isOuterPanel && obj.userData.swappable) {
+            // First-person: cycle through the procedural window views in place
+            // (no popup — pointer is locked and a popup couldn't be clicked).
+            if (fpClick) {
+                cyclePanelView(obj);
+                return;
+            }
+            // Overview / mixed preset: open the popup picker as before.
+            if (state.panelPreset === 'mixed') {
+                togglePanel(obj, event.clientX, event.clientY);
+                return;
+            }
+        }
+
+        // Sensor / system hotspot
+        if (obj.userData.sensorId) {
+            showSensorPanel(obj.userData.sensorId);
+            return;
+        }
+
+        // Module info + fly-to
+        if (obj.userData.moduleType || obj.userData.isDomeModule) {
+            let node = obj;
+            while (node && !node.userData.isDomeModule) node = node.parent;
+            if (node && state.viewMode === 'overview') flyToModule(node);
+            showModulePanel(obj);
+            return;
+        }
+    }
+}
+
+function togglePanel(panel, screenX, screenY) {
+    const isWindow = panel.userData.panelType === 'window';
+    if (isWindow) {
+        // Already a window — show the view selector instead of immediately toggling
+        showViewSelector(panel, screenX ?? window.innerWidth / 2, screenY ?? window.innerHeight / 2);
+        return;
+    }
+    // Opaque → window: apply default Earth view and open selector
+    applyViewToPanel(panel, 'earth');
+    showViewSelector(panel, screenX ?? window.innerWidth / 2, screenY ?? window.innerHeight / 2);
+}
+
+function showModulePanel(obj) {
+    // Walk up to find module root
+    let node = obj;
+    while (node && !node.userData.moduleName) node = node.parent;
+    if (!node) return;
+
+    const panel = document.getElementById('module-panel');
+    const title = document.getElementById('module-panel-title');
+    const body  = document.getElementById('module-panel-body');
+    if (!panel || !title || !body) return;
+
+    const moduleType = node.userData.moduleType;
+    const info = MODULE_TYPES[moduleType];
+    title.textContent = node.userData.moduleName || moduleType;
+
+    const systems = info?.systems || [];
+    const sensors = MODULE_SENSORS[moduleType] || [];
+
+    // Build live metric rows
+    let metricsHtml = '';
+    if (sensors.length > 0 && state.sample && !state.privacyMode) {
+        metricsHtml = '<div class="module-metrics">';
+        for (const key of sensors) {
+            const meta = METRIC_META[key];
+            if (!meta) continue;
+            const val = state.sample[key];
+            const display = typeof val === 'number' ? val.toFixed(1) : val;
+            const status = metricStatus(key, val);
+            const statusColor = { green: '#4ade80', yellow: '#facc15', red: '#f87171' }[status];
+            const pct = Math.max(0, Math.min(100, ((val - meta.min) / (meta.max - meta.min)) * 100));
+            metricsHtml += `
+                <div class="module-metric-row">
+                    <span class="module-metric-icon">${meta.icon}</span>
+                    <span class="module-metric-label">${meta.label}</span>
+                    <span class="module-metric-val" style="color:${meta.color}">${display}</span>
+                    <span class="sensor-status-dot" style="background:${statusColor}"></span>
+                    <div class="module-metric-bar"><div class="sensor-range-fill" style="width:${pct}%;background:${meta.color}"></div></div>
+                </div>`;
+        }
+        metricsHtml += '</div>';
+    } else if (state.privacyMode) {
+        metricsHtml = '<p class="sensor-meta"><em>Privacy mode active</em></p>';
+    }
+
+    const activeSpecId = node.userData.specializationId || null;
+    const specHtml = (moduleType !== 'hub') ? `
+        <div class="module-divider"></div>
+        <p class="module-section-title">Specialize as</p>
+        <div class="module-specializations">
+            ${SECONDARY_SPECIALIZATIONS.map(s => `
+                <button class="legend-row module-spec-row${s.id === activeSpecId ? ' is-active' : ''}" data-spec-id="${s.id}">
+                    <span class="legend-dot" style="background:#${s.color.toString(16).padStart(6, '0')}"></span>
+                    <span class="legend-name">
+                        <strong>${s.name}</strong>
+                        <span class="module-spec-desc">${s.description}</span>
+                    </span>
+                </button>
+            `).join('')}
+        </div>
+    ` : '';
+
+    body.innerHTML = `
+        <p><strong>Type:</strong> <span class="module-value">${moduleType}</span></p>
+        <p><strong>Systems:</strong></p>
+        ${systems.map(s => `<p style="padding-left:0.5rem">• ${s}</p>`).join('')}
+        <div class="module-divider"></div>
+        <p class="module-section-title">Live Sensors</p>
+        ${metricsHtml}
+        <div class="module-divider"></div>
+        <p><strong>Greenery:</strong> <span class="module-value">Active</span></p>
+        <p><strong>Circadian:</strong> <span class="module-value">${state.missionTime.toFixed(1)}h</span></p>
+        ${specHtml}
+    `;
+
+    body.querySelectorAll('.module-spec-row').forEach(btn => {
+        btn.addEventListener('click', () => assignSpecialization(node, btn.dataset.specId));
+    });
+
+    // Close sensor panel if open
+    document.getElementById('sensor-panel')?.classList.remove('open');
+    panel.classList.add('open');
+}
+
+function assignSpecialization(moduleGroup, specId) {
+    const spec = SECONDARY_SPECIALIZATIONS.find(s => s.id === specId);
+    if (!spec || !moduleGroup) return;
+
+    moduleGroup.userData.moduleName = spec.name;
+    moduleGroup.userData.specializationId = spec.id;
+
+    if (moduleGroup.userData.labelDiv) {
+        moduleGroup.userData.labelDiv.textContent = spec.name;
+    }
+
+    const layoutEntry = state.layout.find(m =>
+        m.type === moduleGroup.userData.moduleType &&
+        Math.abs(m.position[0] - moduleGroup.position.x) < 0.01 &&
+        Math.abs(m.position[2] - moduleGroup.position.z) < 0.01
+    );
+    if (layoutEntry) {
+        layoutEntry.name = spec.name;
+        layoutEntry.specializationId = spec.id;
+    }
+
+    showModulePanel(moduleGroup);
+}
+
+function showSensorPanel(sensorId) {
+    const panel = document.getElementById('sensor-panel');
+    const title = document.getElementById('sensor-panel-title');
+    const body  = document.getElementById('sensor-panel-body');
+    if (!panel || !title || !body) return;
+
+    const meta = METRIC_META[sensorId];
+    const label = meta ? meta.label : sensorId;
+    const icon_display = meta ? meta.icon : icon('chartBar');
+    title.innerHTML = `${icon_display} ${label}`;
+
+    const val = state.sample ? state.sample[sensorId] : null;
+    const displayVal = state.privacyMode ? '—' : (val !== null ? (typeof val === 'number' ? val.toFixed(1) : val) : '—');
+    const unit = meta ? meta.unit : '';
+    const status = val !== null ? metricStatus(sensorId, val) : 'green';
+    const statusLabel = { green: 'Normal', yellow: 'Caution', red: 'Alert' }[status];
+    const statusColor = { green: '#4ade80', yellow: '#facc15', red: '#f87171' }[status];
+
+    // Range bar percentage
+    const pct = (meta && val !== null) ? Math.max(0, Math.min(100, ((val - meta.min) / (meta.max - meta.min)) * 100)) : 0;
+
+    // Sparkline
+    const sparkline = state.privacyMode ? '' : buildSparkline(sensorId);
+
+    body.innerHTML = `
+        <div class="sensor-current">
+            <span class="sensor-big-value" style="color:${meta ? meta.color : '#38bdf8'}">${displayVal}</span>
+            <span class="sensor-unit">${state.privacyMode ? '' : unit}</span>
+            <span class="sensor-status-dot" style="background:${statusColor}" title="${statusLabel}"></span>
+        </div>
+        <div class="sensor-range-bar-wrap">
+            <div class="sensor-range-bar">
+                <div class="sensor-range-fill" style="width:${state.privacyMode ? 0 : pct}%;background:${meta ? meta.color : '#38bdf8'}"></div>
+            </div>
+            <div class="sensor-range-labels">
+                <span>${meta ? meta.min : 0}</span>
+                <span>${meta ? meta.max : 100}</span>
+            </div>
+        </div>
+        ${sparkline ? `<div class="sensor-sparkline-wrap"><span class="sensor-spark-label">Trend (30 pts)</span>${sparkline}</div>` : ''}
+        <div class="sensor-meta">
+            <p><strong>Status:</strong> <span style="color:${statusColor}">${state.privacyMode ? 'PRIVATE' : statusLabel}</span></p>
+            <p><strong>Scenario:</strong> ${state.scenario}</p>
+        </div>
+    `;
+
+    // Highlight matching hotspots across habitat
+    highlightSystem(sensorId);
+
+    document.getElementById('module-panel')?.classList.remove('open');
+    panel.classList.add('open');
+}
+
+/* ============================================
+   Hover Highlight
+   ============================================ */
+
+function onHover(event) {
+    if (state.viewMode === 'rearrange' && isDragging) return;
+
+    const rect = canvas.getBoundingClientRect();
+    state.mouse.x =  ((event.clientX - rect.left) / rect.width)  * 2 - 1;
+    state.mouse.y = -((event.clientY - rect.top)  / rect.height) * 2 + 1;
+    state.raycaster.setFromCamera(state.mouse, camera);
+
+    if (!state.habitatGroup) return;
+    const intersects = state.raycaster.intersectObjects(state.habitatGroup.children, true);
+
+    let newHover = null;
+    for (const hit of intersects) {
+        const obj = hit.object;
+        if (obj.userData.isOuterPanel && obj.userData.swappable) { newHover = obj; break; }
+        if (obj.userData.sensorId)    { newHover = obj; break; }
+        if (obj.userData.moduleType)  { newHover = obj; break; }
+    }
+
+    // Reset previous
+    if (state.hoveredObject && state.hoveredObject !== newHover) {
+        const prev = state.hoveredObject;
+        if (prev.material && prev.userData._savedEmissive !== undefined) {
+            prev.material.emissiveIntensity = prev.userData._savedEmissive;
+            delete prev.userData._savedEmissive;
+        }
+    }
+
+    // Apply new
+    if (newHover && newHover !== state.hoveredObject) {
+        if (newHover.material && newHover.material.emissiveIntensity !== undefined) {
+            newHover.userData._savedEmissive = newHover.material.emissiveIntensity;
+            newHover.material.emissiveIntensity = Math.min(newHover.userData._savedEmissive + 0.3, 1.0);
+        }
+        canvas.style.cursor = 'pointer';
+    } else if (!newHover) {
+        canvas.style.cursor = '';
+    }
+
+    state.hoveredObject = newHover;
+}
+
+/* ============================================
+   Camera Fly-To Module
+   ============================================ */
+
+function flyToModule(moduleGroup) {
+    if (!moduleGroup) return;
+    const targetPos = moduleGroup.position.clone();
+    const r = moduleGroup.userData.domeRadius || 5;
+    const offset = new THREE.Vector3(r * 1.8, r * 1.2, r * 1.8);
+    const from = camera.position.clone();
+    const to = targetPos.clone().add(offset);
+
+    state.cameraFly = {
+        from,
+        to,
+        targetFrom: orbitControls.target.clone(),
+        targetTo: targetPos.clone().add(new THREE.Vector3(0, 1, 0)),
+        progress: 0,
+        duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0.01 : 1.0
+    };
+    announce(`Flying to ${moduleGroup.userData.moduleName || moduleGroup.userData.moduleType}`);
+}
+
+function updateCameraFly(delta) {
+    const fly = state.cameraFly;
+    if (!fly) return;
+
+    fly.progress += delta / fly.duration;
+    if (fly.progress >= 1) {
+        camera.position.copy(fly.to);
+        orbitControls.target.copy(fly.targetTo);
+        state.cameraFly = null;
+    } else {
+        // Smooth ease-in-out
+        const t = fly.progress * fly.progress * (3 - 2 * fly.progress);
+        camera.position.lerpVectors(fly.from, fly.to, t);
+        orbitControls.target.lerpVectors(fly.targetFrom, fly.targetTo, t);
+    }
+    orbitControls.update();
+}
+
+/* ============================================
+   Animated Object Cache
+   ============================================ */
+
+/**
+ * Walk the habitat group once and cache references to all objects
+ * that need per-frame updates (hotspots, particles, holo rings, etc.).
+ * Call after every build/rebuild.
+ */
+function cacheAnimatedObjects() {
+    const c = state._cached;
+    c.hotspots = [];
+    c.holoRings = [];
+    c.growLights = [];
+    c.screens = [];
+    c.particles = [];
+    c.circadianFixtures = [];
+    c.toggleAnims = [];
+    c.doorScanLines = [];
+    c.doorCornerNodes = [];
+    c.slidingDoors = [];
+    c.motionSensors = [];
+    c.doorAssemblies = [];
+    c.doorwayLEDs = [];
+    c.circadianLights = [];
+
+    if (!state.habitatGroup) return;
+    // Make sure world matrices are up to date so we can resolve sensor world positions
+    state.habitatGroup.updateMatrixWorld(true);
+    state.habitatGroup.traverse(child => {
+        if (child.userData.isHotspot && child.material) c.hotspots.push(child);
+        if (child.userData.isHologramRing) c.holoRings.push(child);
+        if (child.userData.isGrowLight && child.material) c.growLights.push(child);
+        if (child.userData.isScreen && child.material) c.screens.push(child);
+        if (child.userData.isParticleSystem) c.particles.push(child);
+        if (child.userData.isCircadianFixture && child.material) c.circadianFixtures.push(child);
+        if (child.userData.isDoorScanLine && child.material) c.doorScanLines.push(child);
+        if (child.userData.isDoorCornerNode && child.material) c.doorCornerNodes.push(child);
+        if (child.userData.isSlidingDoor) c.slidingDoors.push(child);
+        if (child.userData.isMotionSensor) {
+            child.getWorldPosition(child.userData.worldPos);
+            c.motionSensors.push(child);
+        }
+        if (child.userData.isDoorwayAssembly) {
+            // Cache flat XZ position for fast distance/axial checks each frame.
+            const wp = new THREE.Vector3();
+            child.getWorldPosition(wp);
+            child.userData.worldX = wp.x;
+            child.userData.worldZ = wp.z;
+            c.doorAssemblies.push(child);
+        }
+        if (child.userData.isDoorwayLED && child.material) c.doorwayLEDs.push(child);
+        if (child.userData.isCircadianLight && child.isLight) c.circadianLights.push(child);
+    });
+}
+
+/* ============================================
+   Sensor Hotspot Pulsing
+   ============================================ */
+
+function pulseSensorHotspots(elapsed) {
+    const hotspots = state._cached.hotspots;
+    for (let i = 0, len = hotspots.length; i < len; i++) {
+        const child = hotspots[i];
+        // Skip if highlighted/dimmed by system highlight
+        if (child.userData._highlighted !== undefined) continue;
+        const phase = child.userData.sensorId ? child.userData.sensorId.length : 0;
+        const pulse = 1.0 + Math.sin(elapsed * 2.5 + phase) * 0.15;
+        child.scale.setScalar(pulse);
+        child.material.emissiveIntensity = 0.3 + Math.sin(elapsed * 3 + phase) * 0.2;
+    }
+}
+
+/* ============================================
+   Animated Interiors
+   ============================================ */
+
+function animateInteriors(elapsed) {
+    for (let i = 0, len = state._cached.holoRings.length; i < len; i++) {
+        const child = state._cached.holoRings[i];
+        child.rotation.y = elapsed * 0.6;
+        child.rotation.x = Math.sin(elapsed * 0.3) * 0.1;
+    }
+    for (let i = 0, len = state._cached.growLights.length; i < len; i++) {
+        state._cached.growLights[i].material.emissiveIntensity = 0.5 + Math.sin(elapsed * 1.5) * 0.3;
+    }
+    for (let i = 0, len = state._cached.screens.length; i < len; i++) {
+        const child = state._cached.screens[i];
+        child.material.emissiveIntensity = 0.6 + Math.sin(elapsed * 8 + child.id) * 0.15;
+    }
+}
+
+/* ============================================
+   Door Sensor Frame Animation
+   ============================================ */
+
+function animateDoorSensors(elapsed) {
+    // Scan lines sweep up and down inside the frame
+    const scanLines = state._cached.doorScanLines;
+    for (let i = 0, len = scanLines.length; i < len; i++) {
+        const sl = scanLines[i];
+        const phase = i * 0.61;
+        const t = (Math.sin(elapsed * 0.9 + phase) + 1) * 0.5; // 0..1
+        const frameH = sl.userData.scanFrameH || 2.8;
+        sl.position.y = 0.1 + t * (frameH - 0.2);
+        sl.material.opacity = 0.3 + t * 0.5;
+        sl.material.emissiveIntensity = 0.5 + t * 0.4;
+    }
+
+    // Corner and mid-height nodes pulse green
+    const nodes = state._cached.doorCornerNodes;
+    for (let i = 0, len = nodes.length; i < len; i++) {
+        const n = nodes[i];
+        const phase = i * 0.9;
+        n.material.emissiveIntensity = 0.5 + Math.sin(elapsed * 2.0 + phase) * 0.4;
+    }
+}
+
+/* ============================================
+   Earth-View Canvas Texture (for window panels)
+   ============================================ */
+
+/* ============================================
+   View Options — per-window environment textures
+   ============================================ */
+
+const VIEW_OPTIONS = {
+    earth:    { label: 'Earth',    audio: null,                                    make: makeEarthAnimator },
+    forest:   { label: 'Forest',   audio: '../assets/audio/forest-loop.mp3',       make: makeForestAnimator },
+    ocean:    { label: 'Ocean',    audio: '../assets/audio/ocean-loop.mp3',         make: makeOceanAnimator },
+    mountain: { label: 'Mountain', audio: '../assets/audio/the_mountain-space-438391.mp3', make: makeMountainAnimator },
+    aurora:   { label: 'Aurora',   audio: '../assets/audio/aurora-loop.mp3',        make: makeAuroraAnimator }
+};
+
+/* Map: viewId → { texture, draw(time) }. Each canvas-backed texture is
+   shared across all panels showing the same view; one update per tick
+   (throttled in updateAnimatedViews) propagates to every panel. */
+const _viewAnimators = {};
+
+function getViewTexture(viewId) {
+    if (_viewAnimators[viewId]) return _viewAnimators[viewId].texture;
+    const make = VIEW_OPTIONS[viewId]?.make;
+    if (!make) return null;
+    const animator = make();
+    _viewAnimators[viewId] = animator;
+    return animator.texture;
+}
+
+let _lastViewAnimUpdate = 0;
+function updateAnimatedViews(elapsed) {
+    if (elapsed - _lastViewAnimUpdate < 0.1) return; // ~10 Hz
+    _lastViewAnimUpdate = elapsed;
+    for (const id in _viewAnimators) {
+        _viewAnimators[id].draw(elapsed);
+    }
+}
+
+/* Each animator pre-seeds deterministic positions for stars/clouds (so they
+   stay in place between frames) and re-draws the canvas each tick with
+   time-varying alpha, offsets, and gradients to create gentle motion. */
+
+function _makeAnimatorBase(size = 128) {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
+    return { size, canvas, ctx, texture };
+}
+
+/* Deterministic pseudo-random in [0, 1). */
+function _hashRand(i, salt = 1) {
+    const x = Math.sin(i * 12.9898 + salt * 78.233) * 43758.5453;
+    return x - Math.floor(x);
+}
+
+function makeEarthAnimator() {
+    const { size, ctx, texture } = _makeAnimatorBase();
+    const cx = size * 0.5, cy = size * 0.55, r = size * 0.3;
+
+    const stars = [];
+    for (let i = 0; i < 30; i++) {
+        const sx = _hashRand(i, 1) * size;
+        const sy = _hashRand(i, 2) * size;
+        if (Math.hypot(sx - cx, sy - cy) < r + 5) continue;
+        stars.push({ x: sx, y: sy, baseAlpha: 0.3 + _hashRand(i, 3) * 0.5, phase: _hashRand(i, 4) * Math.PI * 2 });
+    }
+    const clouds = [];
+    for (let i = 0; i < 7; i++) {
+        clouds.push({
+            angle: _hashRand(i, 5) * Math.PI * 2,
+            radial: 0.45 + _hashRand(i, 6) * 0.45,
+            sz: 0.14 + _hashRand(i, 7) * 0.12
+        });
+    }
+
+    function draw(t) {
+        ctx.fillStyle = '#050510'; ctx.fillRect(0, 0, size, size);
+        for (let i = 0; i < stars.length; i++) {
+            const s = stars[i];
+            const a = Math.max(0.05, s.baseAlpha + Math.sin(t * 1.6 + s.phase) * 0.25);
+            ctx.fillStyle = `rgba(255,255,255,${a})`;
+            ctx.fillRect(s.x, s.y, 1, 1);
+        }
+        const g = ctx.createRadialGradient(cx - r * 0.2, cy - r * 0.2, r * 0.1, cx, cy, r);
+        g.addColorStop(0, '#88ccff'); g.addColorStop(0.4, '#2277bb');
+        g.addColorStop(0.7, '#115588'); g.addColorStop(1, '#051530');
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+
+        ctx.fillStyle = 'rgba(50,140,70,0.6)';
+        ctx.beginPath(); ctx.ellipse(cx - r*0.2, cy - r*0.1, r*0.25, r*0.15, -0.3, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(cx + r*0.3, cy + r*0.2, r*0.2,  r*0.3,  0.2,  0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(cx - r*0.4, cy + r*0.4, r*0.15, r*0.1,  0.5,  0, Math.PI*2); ctx.fill();
+
+        // Drifting cloud overlay, clipped to disk
+        ctx.save();
+        ctx.beginPath(); ctx.arc(cx, cy, r - 1, 0, Math.PI * 2); ctx.clip();
+        const rot = t * 0.08;
+        ctx.fillStyle = 'rgba(255,255,255,0.32)';
+        for (let i = 0; i < clouds.length; i++) {
+            const c = clouds[i];
+            const a = c.angle + rot;
+            const ex = cx + Math.cos(a) * r * c.radial;
+            const ey = cy + Math.sin(a) * r * c.radial * 0.55;
+            ctx.beginPath();
+            ctx.ellipse(ex, ey, r * c.sz, r * c.sz * 0.5, a, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+
+        // Atmospheric ring (subtle breathe)
+        const ringA = 0.25 + Math.sin(t * 0.4) * 0.08;
+        ctx.beginPath(); ctx.arc(cx, cy, r + 2, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(100,180,255,${ringA})`; ctx.lineWidth = 3; ctx.stroke();
+
+        texture.needsUpdate = true;
+    }
+    draw(0);
+    return { texture, draw };
+}
+
+function makeForestAnimator() {
+    const { size, ctx, texture } = _makeAnimatorBase();
+
+    const stars = [];
+    for (let i = 0; i < 40; i++) {
+        stars.push({
+            x: _hashRand(i, 11) * size,
+            y: _hashRand(i, 12) * size * 0.55,
+            baseAlpha: 0.2 + _hashRand(i, 13) * 0.6,
+            phase: _hashRand(i, 14) * Math.PI * 2
+        });
+    }
+
+    function draw(t) {
+        const sky = ctx.createLinearGradient(0, 0, 0, size);
+        sky.addColorStop(0, '#05080f'); sky.addColorStop(1, '#0d1a10');
+        ctx.fillStyle = sky; ctx.fillRect(0, 0, size, size);
+
+        // Moon
+        ctx.beginPath(); ctx.arc(size * 0.75, size * 0.18, 8, 0, Math.PI * 2);
+        ctx.fillStyle = '#d4d8c8'; ctx.fill();
+
+        // Twinkling stars
+        for (let i = 0; i < stars.length; i++) {
+            const s = stars[i];
+            const a = Math.max(0.05, s.baseAlpha + Math.sin(t * 1.8 + s.phase) * 0.3);
+            ctx.fillStyle = `rgba(255,255,255,${a})`;
+            ctx.fillRect(s.x, s.y, 1, 1);
+        }
+
+        // Tree silhouettes (static)
+        ctx.fillStyle = '#051508';
+        for (let i = 0; i < 14; i++) {
+            const tx = (i / 13) * size + Math.sin(i) * 4;
+            const th = 18 + Math.sin(i * 2.3) * 8;
+            ctx.beginPath();
+            ctx.moveTo(tx, size); ctx.lineTo(tx - 6, size - th * 0.5);
+            ctx.lineTo(tx - 4, size - th * 0.5); ctx.lineTo(tx - 3, size - th * 0.7);
+            ctx.lineTo(tx - 2, size - th * 0.7); ctx.lineTo(tx, size - th);
+            ctx.lineTo(tx + 2, size - th * 0.7); ctx.lineTo(tx + 3, size - th * 0.7);
+            ctx.lineTo(tx + 4, size - th * 0.5); ctx.lineTo(tx + 6, size - th * 0.5);
+            ctx.closePath(); ctx.fill();
+        }
+
+        // Drifting ground mist — horizontal scroll
+        const mistOff = (t * 8) % size;
+        for (let pass = 0; pass < 2; pass++) {
+            const mist = ctx.createLinearGradient(0, size * 0.8, 0, size);
+            const breathe = 0.12 + Math.sin(t * 0.5 + pass) * 0.05;
+            mist.addColorStop(0, 'rgba(140,200,140,0)');
+            mist.addColorStop(1, `rgba(140,200,140,${breathe})`);
+            ctx.fillStyle = mist;
+            const xOff = pass === 0 ? -mistOff : size - mistOff;
+            ctx.fillRect(xOff, size * 0.8, size, size * 0.2);
+        }
+
+        texture.needsUpdate = true;
+    }
+    draw(0);
+    return { texture, draw };
+}
+
+function makeOceanAnimator() {
+    const { size, ctx, texture } = _makeAnimatorBase();
+
+    const stars = [];
+    for (let i = 0; i < 25; i++) {
+        stars.push({
+            x: _hashRand(i, 21) * size,
+            y: _hashRand(i, 22) * size * 0.35,
+            baseAlpha: 0.2 + _hashRand(i, 23) * 0.5,
+            phase: _hashRand(i, 24) * Math.PI * 2
+        });
+    }
+    const sparkles = [];
+    for (let i = 0; i < 20; i++) {
+        sparkles.push({
+            x: _hashRand(i, 31) * size,
+            y: size * 0.5 + _hashRand(i, 32) * size * 0.5,
+            phase: _hashRand(i, 33) * Math.PI * 2
+        });
+    }
+
+    function draw(t) {
+        const bg = ctx.createLinearGradient(0, 0, 0, size);
+        bg.addColorStop(0, '#0a1a2e'); bg.addColorStop(0.4, '#1a3a5c'); bg.addColorStop(1, '#0d2a40');
+        ctx.fillStyle = bg; ctx.fillRect(0, 0, size, size);
+
+        const hor = ctx.createLinearGradient(0, size * 0.38, 0, size * 0.5);
+        hor.addColorStop(0, 'rgba(255,180,80,0.18)'); hor.addColorStop(1, 'rgba(255,180,80,0)');
+        ctx.fillStyle = hor; ctx.fillRect(0, size * 0.38, size, size * 0.12);
+
+        for (let i = 0; i < stars.length; i++) {
+            const s = stars[i];
+            const a = Math.max(0.05, s.baseAlpha + Math.sin(t * 2.0 + s.phase) * 0.25);
+            ctx.fillStyle = `rgba(255,255,255,${a})`;
+            ctx.fillRect(s.x, s.y, 1, 1);
+        }
+
+        // Wave arcs scrolling horizontally
+        ctx.strokeStyle = 'rgba(120,200,255,0.3)'; ctx.lineWidth = 1;
+        for (let w = 0; w < 8; w++) {
+            const wy = size * 0.5 + w * (size * 0.065);
+            const phase = t * 0.6 + w * 0.8;
+            ctx.beginPath();
+            for (let x = 0; x <= size; x += 4) {
+                const y = wy + Math.sin((x / size) * Math.PI * 4 + phase) * 2;
+                x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+
+        // Caustic sparkles fade in/out
+        for (let i = 0; i < sparkles.length; i++) {
+            const sp = sparkles[i];
+            const a = Math.max(0, 0.35 + Math.sin(t * 2.5 + sp.phase) * 0.35);
+            ctx.fillStyle = `rgba(200,240,255,${a})`;
+            ctx.beginPath(); ctx.arc(sp.x, sp.y, 1, 0, Math.PI * 2); ctx.fill();
+        }
+
+        texture.needsUpdate = true;
+    }
+    draw(0);
+    return { texture, draw };
+}
+
+function makeMountainAnimator() {
+    const { size, ctx, texture } = _makeAnimatorBase();
+
+    const stars = [];
+    for (let i = 0; i < 60; i++) {
+        const big = _hashRand(i, 41) < 0.15;
+        stars.push({
+            x: _hashRand(i, 42) * size,
+            y: _hashRand(i, 43) * size * 0.65,
+            big,
+            baseAlpha: 0.2 + _hashRand(i, 44) * 0.7,
+            phase: _hashRand(i, 45) * Math.PI * 2
+        });
+    }
+
+    function draw(t) {
+        const sky = ctx.createLinearGradient(0, 0, 0, size);
+        sky.addColorStop(0, '#080414'); sky.addColorStop(0.6, '#1a0a30'); sky.addColorStop(1, '#0a0814');
+        ctx.fillStyle = sky; ctx.fillRect(0, 0, size, size);
+
+        for (let i = 0; i < stars.length; i++) {
+            const s = stars[i];
+            const a = Math.max(0.05, s.baseAlpha + Math.sin(t * 1.4 + s.phase) * 0.3);
+            ctx.fillStyle = `rgba(255,255,255,${a})`;
+            const sz = s.big ? 2 : 1;
+            ctx.fillRect(s.x, s.y, sz, sz);
+        }
+
+        // Distant planet
+        ctx.beginPath(); ctx.arc(size * 0.82, size * 0.15, 12, 0, Math.PI * 2);
+        const pg = ctx.createRadialGradient(size * 0.78, size * 0.11, 1, size * 0.82, size * 0.15, 12);
+        pg.addColorStop(0, '#c8a060'); pg.addColorStop(1, '#60380a');
+        ctx.fillStyle = pg; ctx.fill();
+
+        // Far ridge
+        ctx.fillStyle = '#100818';
+        ctx.beginPath(); ctx.moveTo(0, size * 0.72);
+        for (let x = 0; x <= size; x += 8) {
+            ctx.lineTo(x, size * 0.72 - Math.abs(Math.sin(x * 0.07) * 14 + Math.sin(x * 0.19) * 7));
+        }
+        ctx.lineTo(size, size); ctx.lineTo(0, size); ctx.closePath(); ctx.fill();
+
+        // Near ridge
+        ctx.fillStyle = '#040208';
+        ctx.beginPath(); ctx.moveTo(0, size * 0.85);
+        for (let x = 0; x <= size; x += 6) {
+            ctx.lineTo(x, size * 0.85 - Math.abs(Math.sin(x * 0.05 + 1) * 22 + Math.sin(x * 0.13) * 10));
+        }
+        ctx.lineTo(size, size); ctx.lineTo(0, size); ctx.closePath(); ctx.fill();
+
+        ctx.fillStyle = 'rgba(220,230,240,0.65)';
+        for (let p = 10; p < size - 10; p += 18) {
+            const py = size * 0.85 - Math.abs(Math.sin(p * 0.05 + 1) * 22 + Math.sin(p * 0.13) * 10);
+            ctx.beginPath(); ctx.ellipse(p, py + 3, 4, 3, 0, 0, Math.PI * 2); ctx.fill();
+        }
+
+        texture.needsUpdate = true;
+    }
+    draw(0);
+    return { texture, draw };
+}
+
+function makeAuroraAnimator() {
+    const { size, ctx, texture } = _makeAnimatorBase();
+
+    const bands = [
+        { rgb: '0,220,180', alpha: 0.35, y0: 0.15, y1: 0.45, phase: 0,    yAmp: 0.05 },
+        { rgb: '40,255,120', alpha: 0.20, y0: 0.25, y1: 0.60, phase: 1.7, yAmp: 0.06 },
+        { rgb: '160,60,255', alpha: 0.20, y0: 0.10, y1: 0.50, phase: 3.4, yAmp: 0.04 }
+    ];
+    const stars = [];
+    for (let i = 0; i < 50; i++) {
+        stars.push({
+            x: _hashRand(i, 51) * size,
+            y: _hashRand(i, 52) * size * 0.85,
+            baseAlpha: 0.4 + _hashRand(i, 53) * 0.6,
+            phase: _hashRand(i, 54) * Math.PI * 2
+        });
+    }
+
+    function draw(t) {
+        ctx.fillStyle = '#020608'; ctx.fillRect(0, 0, size, size);
+
+        for (const band of bands) {
+            const breathe = Math.sin(t * 0.6 + band.phase) * 0.4 + 1.0; // 0.6..1.4
+            const yShift = Math.sin(t * 0.4 + band.phase) * size * band.yAmp;
+            const y0 = size * band.y0 + yShift;
+            const y1 = size * band.y1 + yShift;
+            const a1 = `rgba(${band.rgb},${band.alpha * breathe})`;
+            const a0 = `rgba(${band.rgb},0)`;
+            const gr = ctx.createLinearGradient(0, y0, 0, y1);
+            gr.addColorStop(0, a0); gr.addColorStop(0.5, a1); gr.addColorStop(1, a0);
+            ctx.fillStyle = gr;
+            ctx.beginPath();
+            for (let x = 0; x <= size; x += 2) {
+                const yOff = Math.sin(x * 0.08 + band.phase + t * 0.3) * size * 0.04;
+                ctx.lineTo(x, y0 + yOff);
+            }
+            for (let x = size; x >= 0; x -= 2) {
+                const yOff = Math.sin(x * 0.08 + band.phase + t * 0.3) * size * 0.04;
+                ctx.lineTo(x, y1 + yOff);
+            }
+            ctx.closePath(); ctx.fill();
+        }
+
+        for (let i = 0; i < stars.length; i++) {
+            const s = stars[i];
+            const a = Math.max(0.1, s.baseAlpha + Math.sin(t * 2.2 + s.phase) * 0.3);
+            ctx.fillStyle = `rgba(255,255,255,${a})`;
+            ctx.fillRect(s.x, s.y, 1, 1);
+        }
+
+        texture.needsUpdate = true;
+    }
+    draw(0);
+    return { texture, draw };
+}
+
+/* Per-panel audio map: uuid → PositionalAudio node for view audio */
+const _panelViewAudio = new Map();
+
+/* Make the outer dome panel look like a regular clear window (the original
+   "window" appearance — light blue tint, transmissive). Used both for the
+   "clear" view and as the outer shell when an Earth-like view is applied
+   (the texture is rendered separately on an inside-only screen). */
+function _setPanelClearWindow(panel) {
+    panel.material.color.set(0x88ccff);
+    panel.material.transmission = 0.6;
+    panel.material.opacity = 0.3;
+    panel.userData.defaultOpacity = 0.3;
+    panel.userData.panelType = 'window';
+    if (panel.material.map) { panel.material.map = null; }
+    if (panel.material.emissiveMap) { panel.material.emissiveMap = null; }
+    panel.material.emissiveIntensity = 0;
+}
+
+/* Add (or update) an inside-only "screen" mesh just behind the panel that
+   displays the procedural Earth-like texture. The screen is single-sided
+   (back-side rendering, since the panel triangles wind CCW when viewed from
+   outside) so it's only visible from inside the dome — the exterior view
+   stays a clear window. */
+function _attachInnerScreen(panel, texture) {
+    if (panel.userData._innerScreen) {
+        const s = panel.userData._innerScreen;
+        s.material.map = texture;
+        s.material.emissiveMap = texture;
+        s.material.needsUpdate = true;
+        return;
+    }
+    const innerGeo = panel.geometry.clone();
+    // First normal entry = panel's outward-pointing normal (all triangles share it).
+    const n = innerGeo.attributes.normal.array;
+    const outward = new THREE.Vector3(n[0], n[1], n[2]).normalize();
+    const offset = 0.08;
+    const pos = innerGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+        pos.array[i * 3]     -= outward.x * offset;
+        pos.array[i * 3 + 1] -= outward.y * offset;
+        pos.array[i * 3 + 2] -= outward.z * offset;
+    }
+    pos.needsUpdate = true;
+
+    const innerMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        map: texture,
+        emissive: new THREE.Color(0xffffff),
+        emissiveMap: texture,
+        emissiveIntensity: 1.0,
+        roughness: 0.4,
+        metalness: 0.1,
+        side: THREE.BackSide
+    });
+    const inner = new THREE.Mesh(innerGeo, innerMat);
+    inner.userData.isInnerScreen = true;
+    panel.add(inner);
+    panel.userData._innerScreen = inner;
+}
+
+function _removeInnerScreen(panel) {
+    const s = panel.userData._innerScreen;
+    if (!s) return;
+    panel.remove(s);
+    s.geometry.dispose();
+    s.material.dispose();
+    delete panel.userData._innerScreen;
+}
+
+function applyViewToPanel(panel, viewId) {
+    if (viewId === 'opaque') {
+        panel.material.color.set(0x8a8a8a);
+        panel.material.transmission = 0;
+        panel.material.opacity = 1.0;
+        panel.userData.defaultOpacity = 1.0;
+        panel.userData.panelType = 'opaque';
+        panel.userData.viewOption = null;
+        if (panel.material.map) { panel.material.map = null; }
+        if (panel.material.emissiveMap) { panel.material.emissiveMap = null; }
+        panel.material.emissiveIntensity = 0;
+        _removeInnerScreen(panel);
+        const pa = _panelViewAudio.get(panel.uuid);
+        if (pa && pa.isPlaying) pa.stop();
+    } else if (viewId === 'regular') {
+        _setPanelClearWindow(panel);
+        panel.userData.viewOption = 'regular';
+        _removeInnerScreen(panel);
+        const pa = _panelViewAudio.get(panel.uuid);
+        if (pa && pa.isPlaying) pa.stop();
+    } else {
+        const opt = VIEW_OPTIONS[viewId];
+        if (!opt) return;
+        // Outer panel = clear regular window (no texture visible from outside).
+        _setPanelClearWindow(panel);
+        panel.userData.viewOption = viewId;
+        // Inner screen = self-illuminated texture, only visible from inside.
+        _attachInnerScreen(panel, getViewTexture(viewId));
+    }
+    if (state.cutaway) panel.material.opacity = 0.15;
+    panel.material.needsUpdate = true;
+
+    // Scale-flip transition
+    panel.userData._toggleAnim = { progress: 0, duration: 0.25 };
+    panel.scale.setScalar(0.92);
+    if (!state._cached.toggleAnims.includes(panel)) {
+        state._cached.toggleAnims.push(panel);
+    }
+
+    // Refresh nature audio if global sound is on
+    if (natureBuffer) attachWindowAudio();
+
+    const labelMap = { opaque: 'Opaque', regular: 'Regular' };
+    announce(`Window view: ${labelMap[viewId] ?? VIEW_OPTIONS[viewId]?.label ?? viewId}`);
+}
+
+/* Show/hide the view selector popup near the clicked screen position */
+const _viewSelectorEl = document.getElementById('view-selector');
+let _viewSelectorPanel = null;
+
+function showViewSelector(panel, screenX, screenY) {
+    _viewSelectorPanel = panel;
+    const el = _viewSelectorEl;
+    if (!el) return;
+
+    // Update active state on buttons
+    const current = panel.userData.viewOption ?? (panel.userData.panelType === 'window' ? 'earth' : 'opaque');
+    el.querySelectorAll('.view-option-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.view === current);
+    });
+
+    // Position near click, keeping inside viewport
+    const margin = 10;
+    const vpW = window.innerWidth, vpH = window.innerHeight;
+    el.removeAttribute('hidden');
+    const w = el.offsetWidth || 170, h = el.offsetHeight || 220;
+    let left = screenX + 12, top = screenY - h / 2;
+    if (left + w > vpW - margin) left = screenX - w - 12;
+    if (top < margin) top = margin;
+    if (top + h > vpH - margin) top = vpH - h - margin;
+    el.style.left = `${left}px`;
+    el.style.top  = `${top}px`;
+}
+
+function hideViewSelector() {
+    if (_viewSelectorEl) _viewSelectorEl.setAttribute('hidden', '');
+    _viewSelectorPanel = null;
+}
+
+// Wire view-option buttons
+if (_viewSelectorEl) {
+    _viewSelectorEl.addEventListener('click', e => {
+        const btn = e.target.closest('.view-option-btn');
+        if (btn && _viewSelectorPanel) {
+            applyViewToPanel(_viewSelectorPanel, btn.dataset.view);
+            hideViewSelector();
+        }
+        e.stopPropagation();
+    });
+}
+
+// Dismiss on outside click
+document.addEventListener('click', e => {
+    if (_viewSelectorEl && !_viewSelectorEl.hasAttribute('hidden')) {
+        if (!_viewSelectorEl.contains(e.target)) hideViewSelector();
+    }
+}, true);
+
+/* ============================================
+   Particle System Animation
+   ============================================ */
+
+function animateParticles(delta) {
+    const particles = state._cached.particles;
+    for (let p = 0, pLen = particles.length; p < pLen; p++) {
+        const child = particles[p];
+        const positions = child.geometry.attributes.position;
+        const vel = child.userData.velocities;
+        const bounds = child.userData.bounds;
+        const arr = positions.array;
+
+        for (let i = 0; i < positions.count; i++) {
+            arr[i * 3]     += vel[i * 3];
+            arr[i * 3 + 1] += vel[i * 3 + 1];
+            arr[i * 3 + 2] += vel[i * 3 + 2];
+
+            // Wrap Y — respawn at bottom when reaching top
+            if (arr[i * 3 + 1] > bounds.yMax) {
+                arr[i * 3 + 1] = bounds.yMin;
+            }
+
+            // Wrap radial — keep within dome radius
+            const dx = arr[i * 3];
+            const dz = arr[i * 3 + 2];
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            if (dist > bounds.radius) {
+                const scale = bounds.radius / dist * 0.5;
+                arr[i * 3]     *= scale;
+                arr[i * 3 + 2] *= scale;
+            }
+        }
+        positions.needsUpdate = true;
+    }
+}
+
+/* ============================================
+   Panel Toggle Transition Animation
+   ============================================ */
+
+function animatePanelTransitions(delta) {
+    const anims = state._cached.toggleAnims;
+    for (let i = anims.length - 1; i >= 0; i--) {
+        const child = anims[i];
+        const anim = child.userData._toggleAnim;
+        if (!anim) { anims.splice(i, 1); continue; }
+        anim.progress += delta / anim.duration;
+        if (anim.progress >= 1) {
+            child.scale.setScalar(1.0);
+            delete child.userData._toggleAnim;
+            anims.splice(i, 1);
+        } else {
+            const t = anim.progress;
+            const scale = 0.92 + 0.08 * (1 - Math.pow(1 - t, 3));
+            child.scale.setScalar(scale);
+        }
+    }
+}
+
+/* ============================================
+   Circadian Fixture Color Updates
+   ============================================ */
+
+function updateCircadianFixtures(hour) {
+    // Map hour → warm to cool color shift
+    const keys = [0, 6, 12, 18, 24];
+    const colors = [0x331122, 0xff9944, 0xffeedd, 0xff8833, 0x331122];
+    const intensities = [0.04, 0.35, 0.70, 0.40, 0.04];
+
+    let idx = 0;
+    for (let k = 0; k < keys.length - 1; k++) {
+        if (hour >= keys[k] && hour <= keys[k + 1]) { idx = k; break; }
+    }
+    const t = (hour - keys[idx]) / (keys[idx + 1] - keys[idx]);
+    const colA = new THREE.Color(colors[idx]);
+    const colB = new THREE.Color(colors[idx + 1]);
+    const blended = colA.lerp(colB, t);
+    const intensity = THREE.MathUtils.lerp(intensities[idx], intensities[idx + 1], t);
+
+    const fixtures = state._cached.circadianFixtures;
+    for (let i = 0, len = fixtures.length; i < len; i++) {
+        const child = fixtures[i];
+        child.material.color.copy(blended);
+        child.material.emissive.copy(blended);
+        child.material.emissiveIntensity = intensity;
+        // Store base values so the doorway proximity boost can layer on top.
+        child.userData.baseEmissiveIntensity = intensity;
+    }
+
+    // Per-module ceiling point lights (no visible mesh) — colour + intensity
+    // shift with the same circadian curve so each dome interior reads as
+    // warm at dawn/dusk, cool at noon, dim at night.
+    const lights = state._cached.circadianLights;
+    for (let i = 0, len = lights.length; i < len; i++) {
+        const light = lights[i];
+        light.color.copy(blended);
+        const factor = light.userData.baseIntensityFactor ?? 1.0;
+        // Map circadian intensity (0.04..0.7) to a usable point-light range.
+        light.intensity = 0.15 + intensity * factor;
+    }
+}
+
+/* ============================================
+   Motion Sensor Proximity + Sliding Door Animation
+   ============================================ */
+
+const SENSOR_TRIGGER_DIST = 5.0;   // open the door when within this distance
+const ACTIVE_ZONE_FRAC = 0.25;      // door's "active" portion of corridor (0..0.25 or 0.75..1)
+const SENSOR_LERP_RATE = 5.0;
+const DOOR_LERP_RATE = 4.0;
+const BOOST_DECAY_RATE = 1.6;
+
+/* Airlock cycling. For each corridor we compute the player's axial position
+   along the corridor (t = 0 at the hub-side door, t = 1 at the peripheral-
+   side door). The hub-side door is "active" only while t < 0.25; the
+   peripheral-side door is "active" only while t > 0.75. So the two doors
+   are never simultaneously open: walking through, the door behind closes
+   at the 1/4 mark, then the next door opens at the 3/4 mark. Within an
+   active zone the door additionally needs the player within 5 m, so it
+   doesn't open from across an adjacent module. */
+function updateMotionSensors(delta) {
+    const fpActive = state.viewMode === 'firstperson' && fpControls.isLocked;
+    const camX = camera.position.x;
+    const camZ = camera.position.z;
+
+    const doors = state._cached.doorAssemblies;
+    for (let i = 0; i < doors.length; i++) {
+        const door = doors[i];
+        // Decay any prior boost so the doorway LEDs return to their base
+        // circadian intensity once the player walks away.
+        const b = door.userData.proximityBoost || 0;
+        door.userData.proximityBoost = Math.max(0, b - delta * BOOST_DECAY_RATE);
+
+        let shouldOpen = false;
+        if (fpActive) {
+            const meta = door.userData.corridorMeta;
+            if (meta) {
+                const dx = camX - meta.startX;
+                const dz = camZ - meta.startZ;
+                const axialPos = dx * meta.dirX + dz * meta.dirZ;
+                const t = axialPos / meta.length;
+
+                const ddx = camX - door.userData.worldX;
+                const ddz = camZ - door.userData.worldZ;
+                const distToDoor = Math.sqrt(ddx * ddx + ddz * ddz);
+
+                if (distToDoor < SENSOR_TRIGGER_DIST) {
+                    const endIdx = door.userData.endIndex;
+                    if (endIdx === 0 && t < ACTIVE_ZONE_FRAC)            shouldOpen = true;
+                    else if (endIdx === 1 && t > 1 - ACTIVE_ZONE_FRAC)   shouldOpen = true;
+                }
+            }
+        }
+
+        door.userData.targetOpen = shouldOpen ? 1.0 : 0.0;
+        if (shouldOpen) door.userData.proximityBoost = 1.0;
+    }
+
+    // Sensor lens follows its parent door's target state — bright green when
+    // the door is opening/open, dim ambient otherwise.
+    const sensors = state._cached.motionSensors;
+    for (let i = 0; i < sensors.length; i++) {
+        const sensor = sensors[i];
+        const door = sensor.userData.doorAssembly;
+        const targetOn = (door.userData.targetOpen || 0) > 0.5;
+        const targetIntensity = targetOn ? 1.0 : 0.15;
+        const cur = sensor.userData.activeIntensity;
+        const next = cur + (targetIntensity - cur) * Math.min(1, delta * SENSOR_LERP_RATE);
+        sensor.userData.activeIntensity = next;
+        sensor.userData.lens.material.emissiveIntensity = next;
+    }
+}
+
+function updateSlidingDoors(delta) {
+    const doors = state._cached.doorAssemblies;
+    for (let i = 0; i < doors.length; i++) {
+        const door = doors[i];
+        const cur = door.userData.currentOpen;
+        const target = door.userData.targetOpen;
+        door.userData.currentOpen = cur + (target - cur) * Math.min(1, delta * DOOR_LERP_RATE);
+    }
+    const panels = state._cached.slidingDoors;
+    for (let i = 0; i < panels.length; i++) {
+        const panel = panels[i];
+        const t = panel.userData.doorAssembly.userData.currentOpen;
+        panel.position.x = panel.userData.closedX + (panel.userData.openX - panel.userData.closedX) * t;
+    }
+}
+
+function updateDoorwayBoost() {
+    const leds = state._cached.doorwayLEDs;
+    for (let i = 0; i < leds.length; i++) {
+        const led = leds[i];
+        const door = led.userData.doorAssembly;
+        const boost = door.userData.proximityBoost || 0;
+        if (boost <= 0) continue;
+        const base = led.userData.baseEmissiveIntensity ?? led.material.emissiveIntensity;
+        led.material.emissiveIntensity = base * (1 + 0.8 * boost);
+    }
+}
+
+/* ============================================
+   Rearrange Mode — Drag, Snap, Add, Remove
+   ============================================ */
+
+const SLOT_RADIUS = 20;      // Distance from hub center
+const SLOT_COUNT  = 8;       // Max peripheral slots
+const MIN_MODULE_DIST = 13;  // Minimum distance between module centers
+
+let isDragging = false;
+const dragOffset = new THREE.Vector3();
+const intersection = new THREE.Vector3();
+
+// Snap animation state
+let snapAnim = null; // { module, from, to, progress, duration }
+
+/**
+ * Get angular slot positions (evenly spaced around hub).
+ */
+function getSlotPositions() {
+    const slots = [];
+    for (let i = 0; i < SLOT_COUNT; i++) {
+        const angle = (i / SLOT_COUNT) * Math.PI * 2;
+        slots.push({
+            x: Math.cos(angle) * SLOT_RADIUS,
+            z: Math.sin(angle) * SLOT_RADIUS,
+            angle
+        });
+    }
+    return slots;
+}
+
+/**
+ * Find the nearest unoccupied slot to a given position.
+ * @param {number} x - target x
+ * @param {number} z - target z
+ * @param {string} [excludeName] - module name to exclude from occupancy check
+ */
+function findNearestOpenSlot(x, z, excludeName) {
+    const slots = getSlotPositions();
+    const occupied = new Set();
+
+    // Mark slots that are already taken by other modules
+    for (const mod of state.layout) {
+        if (mod.type === 'hub') continue;
+        if (mod.name === excludeName) continue;
+        // Find closest slot to this module
+        let bestIdx = 0, bestDist = Infinity;
+        for (let i = 0; i < slots.length; i++) {
+            const dx = mod.position[0] - slots[i].x;
+            const dz = mod.position[2] - slots[i].z;
+            const d = dx * dx + dz * dz;
+            if (d < bestDist) { bestDist = d; bestIdx = i; }
+        }
+        occupied.add(bestIdx);
+    }
+
+    // Find nearest open slot
+    let bestSlot = null, bestDist = Infinity;
+    for (let i = 0; i < slots.length; i++) {
+        if (occupied.has(i)) continue;
+        const dx = x - slots[i].x;
+        const dz = z - slots[i].z;
+        const d = dx * dx + dz * dz;
+        if (d < bestDist) { bestDist = d; bestSlot = slots[i]; }
+    }
+    return bestSlot;
+}
+
+/**
+ * Check if a position collides with any existing module.
+ */
+function wouldCollide(x, z, excludeName) {
+    for (const mod of state.layout) {
+        if (mod.name === excludeName) continue;
+        const dx = mod.position[0] - x;
+        const dz = mod.position[2] - z;
+        if (Math.sqrt(dx * dx + dz * dz) < MIN_MODULE_DIST) return true;
+    }
+    return false;
+}
+
+/**
+ * Rebuild habitat fully: geometry + interiors + circadian fixtures.
+ */
+function fullRebuild() {
+    rebuildHabitat(scene, state);
+    // Re-furnish interiors
+    state.habitatGroup.traverse(child => {
+        if (child.userData.isDomeModule && child.userData.moduleType) {
+            furnishModule(child, child.userData.moduleType);
+        }
+    });
+    cacheAnimatedObjects();
+    updateCircadianFixtures(state.missionTime);
+    applyHandrailVisibility();
+    // Re-attach positional audio to new window panels
+    if (natureBuffer) attachWindowAudio();
+}
+
+/**
+ * Sync a module group's position back to state.layout.
+ */
+function syncLayoutPosition(moduleGroup) {
+    const name = moduleGroup.userData.moduleName;
+    const entry = state.layout.find(m => m.name === name);
+    if (entry) {
+        entry.position = [
+            moduleGroup.position.x,
+            0,
+            moduleGroup.position.z
+        ];
+    }
+}
+
+function onPointerDown(event) {
+    if (state.viewMode !== 'rearrange') return;
+
+    updateMouse(event);
+    state.raycaster.setFromCamera(state.mouse, camera);
+
+    if (!state.habitatGroup) return;
+
+    // Check for removal mode
+    if (state.removeMode) {
+        const modules = [];
+        state.habitatGroup.traverse(child => {
+            if (child.userData.isDomeModule) modules.push(child);
+        });
+        const intersects = state.raycaster.intersectObjects(modules, true);
+        if (intersects.length > 0) {
+            let target = intersects[0].object;
+            while (target && !target.userData.isDomeModule) target = target.parent;
+            if (target) {
+                if (target.userData.moduleType === 'hub') {
+                    announce('Cannot remove the central hub module.');
+                } else {
+                    removeModule(target.userData.moduleName);
+                }
+            }
+        }
+        return;
+    }
+
+    // Find module domes (skip hub)
+    const modules = [];
+    state.habitatGroup.traverse(child => {
+        if (child.userData.isDomeModule && child.userData.moduleType !== 'hub') {
+            modules.push(child);
+        }
+    });
+
+    const intersects = state.raycaster.intersectObjects(modules, true);
+    if (intersects.length > 0) {
+        orbitControls.enabled = false;
+        let target = intersects[0].object;
+        while (target && !target.userData.isDomeModule) target = target.parent;
+        if (!target || target.userData.moduleType === 'hub') return;
+
+        state.dragModule = target;
+        isDragging = true;
+        state.raycaster.ray.intersectPlane(state.dragPlane, intersection);
+        dragOffset.copy(intersection).sub(target.position);
+
+        canvas.style.cursor = 'grabbing';
+    }
+}
+
+function onPointerMove(event) {
+    if (!isDragging || !state.dragModule) return;
+
+    updateMouse(event);
+    state.raycaster.setFromCamera(state.mouse, camera);
+    state.raycaster.ray.intersectPlane(state.dragPlane, intersection);
+
+    state.dragModule.position.copy(intersection.sub(dragOffset));
+    state.dragModule.position.y = 0; // Keep on ground plane
+}
+
+function onPointerUp() {
+    if (!isDragging || !state.dragModule) return;
+
+    const mod = state.dragModule;
+    isDragging = false;
+    state.dragModule = null;
+    canvas.style.cursor = '';
+
+    if (state.viewMode === 'rearrange') {
+        orbitControls.enabled = true;
+
+        // Snap to nearest open slot
+        const slot = findNearestOpenSlot(mod.position.x, mod.position.z, mod.userData.moduleName);
+        if (slot) {
+            // Animate snap
+            snapAnim = {
+                module: mod,
+                from: mod.position.clone(),
+                to: new THREE.Vector3(slot.x, 0, slot.z),
+                progress: 0,
+                duration: 0.3
+            };
+        } else {
+            // No open slots — sync position as-is
+            syncLayoutPosition(mod);
+            fullRebuild();
+        }
+    }
+}
+
+/**
+ * Update snap animation — called in animate loop.
+ */
+function updateSnapAnimation(delta) {
+    if (!snapAnim) return;
+    snapAnim.progress += delta / snapAnim.duration;
+    if (snapAnim.progress >= 1) {
+        snapAnim.module.position.copy(snapAnim.to);
+        syncLayoutPosition(snapAnim.module);
+        snapAnim = null;
+        fullRebuild();
+        announce('Module snapped to slot.');
+    } else {
+        const t = snapAnim.progress * snapAnim.progress * (3 - 2 * snapAnim.progress);
+        snapAnim.module.position.lerpVectors(snapAnim.from, snapAnim.to, t);
+    }
+}
+
+/* ============================================
+   Add / Remove Modules
+   ============================================ */
+
+function addModule(type, spec = null) {
+    // Find next open slot
+    const slot = findNearestOpenSlot(SLOT_RADIUS, 0);
+    if (!slot) {
+        announce('No open slots available.');
+        return;
+    }
+
+    const info = MODULE_TYPES[type];
+    if (!info) return;
+
+    // Use spec name if provided; otherwise fall back to type-based naming
+    const baseName = spec ? spec.name : info.name;
+    const count = state.layout.filter(m =>
+        spec ? m.specializationId === spec.id : (m.type === type && !m.specializationId)
+    ).length;
+    const name = count > 0 ? `${baseName} ${count + 1}` : baseName;
+
+    const entry = {
+        type,
+        position: [slot.x, 0, slot.z],
+        name
+    };
+    if (spec) entry.specializationId = spec.id;
+
+    state.layout.push(entry);
+
+    fullRebuild();
+    announce(`Added ${name}.`);
+}
+
+function removeModule(moduleName) {
+    const idx = state.layout.findIndex(m => m.name === moduleName);
+    if (idx < 0) return;
+    if (state.layout[idx].type === 'hub') {
+        announce('Cannot remove the central hub.');
+        return;
+    }
+
+    const removed = state.layout.splice(idx, 1)[0];
+    fullRebuild();
+    state.removeMode = false;
+    document.getElementById('btn-remove-module')?.classList.remove('active');
+    canvas.style.cursor = '';
+    announce(`Removed ${removed.name}.`);
+}
+
+function updateMouse(event) {
+    const rect = canvas.getBoundingClientRect();
+    state.mouse.x =  ((event.clientX - rect.left) / rect.width)  * 2 - 1;
+    state.mouse.y = -((event.clientY - rect.top)  / rect.height) * 2 + 1;
+}
+
+/* ============================================
+   First-Person Movement
+   ============================================ */
+
+function initFirstPersonKeys() {
+    document.addEventListener('keydown', (e) => {
+        if (state.viewMode !== 'firstperson') return;
+        switch (e.code) {
+            case 'KeyW': case 'ArrowUp':    fpKeys.forward  = true; break;
+            case 'KeyS': case 'ArrowDown':  fpKeys.backward = true; break;
+            case 'KeyA': case 'ArrowLeft':  fpKeys.left     = true; break;
+            case 'KeyD': case 'ArrowRight': fpKeys.right    = true; break;
+        }
+    });
+
+    document.addEventListener('keyup', (e) => {
+        switch (e.code) {
+            case 'KeyW': case 'ArrowUp':    fpKeys.forward  = false; break;
+            case 'KeyS': case 'ArrowDown':  fpKeys.backward = false; break;
+            case 'KeyA': case 'ArrowLeft':  fpKeys.left     = false; break;
+            case 'KeyD': case 'ArrowRight': fpKeys.right    = false; break;
+        }
+    });
+
+    fpControls.addEventListener('unlock', () => {
+        if (state.viewMode === 'firstperson') {
+            switchViewMode('overview');
+            document.querySelectorAll('.hud-mode-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.mode === 'overview');
+            });
+        }
+    });
+
+    /* Global Escape key — close open panels */
+    document.addEventListener('keydown', (e) => {
+        if (e.code !== 'Escape') return;
+        const sp = document.getElementById('sensor-panel');
+        const mp = document.getElementById('module-panel');
+        if (sp?.classList.contains('open') || mp?.classList.contains('open')) {
+            sp?.classList.remove('open');
+            mp?.classList.remove('open');
+            clearHighlight();
+            announce('Panels closed');
+        }
+    });
+}
+
+const FP_PLAYER_RADIUS = 0.35;
+
+/**
+ * Check if a horizontal point (x, z) is inside the walkable habitat volume:
+ * inside any module dome OR inside any corridor capsule. Uses a player-radius
+ * buffer so the camera never clips through walls.
+ */
+function isWalkablePosition(x, z) {
+    const buf = FP_PLAYER_RADIUS;
+
+    // Module dome disks
+    for (const mod of state.layout) {
+        const info = MODULE_TYPES[mod.type];
+        if (!info) continue;
+        const dx = x - mod.position[0];
+        const dz = z - mod.position[2];
+        if (Math.sqrt(dx * dx + dz * dz) + buf <= info.radius) return true;
+    }
+
+    // Corridor capsules — hub (index 0) to each other module
+    if (state.layout.length > 1) {
+        const hub = state.layout[0];
+        const ax = hub.position[0], az = hub.position[2];
+        for (let i = 1; i < state.layout.length; i++) {
+            const m = state.layout[i];
+            const bx = m.position[0], bz = m.position[2];
+            const sx = bx - ax, sz = bz - az;
+            const len2 = sx * sx + sz * sz;
+            if (len2 < 0.001) continue;
+            let t = ((x - ax) * sx + (z - az) * sz) / len2;
+            if (t < 0 || t > 1) continue;
+            const px = ax + t * sx, pz = az + t * sz;
+            const dx = x - px, dz = z - pz;
+            if (Math.sqrt(dx * dx + dz * dz) + buf <= CORRIDOR_RADIUS) return true;
+        }
+    }
+    return false;
+}
+
+function updateFirstPerson(delta) {
+    if (state.viewMode !== 'firstperson' || !fpControls.isLocked) return;
+
+    const speed = 5.0 * delta;
+    const dir = new THREE.Vector3();
+
+    if (fpKeys.forward)  dir.z -= 1;
+    if (fpKeys.backward) dir.z += 1;
+    if (fpKeys.left)     dir.x -= 1;
+    if (fpKeys.right)    dir.x += 1;
+    dir.normalize();
+
+    const oldX = camera.position.x;
+    const oldZ = camera.position.z;
+
+    fpControls.moveRight(dir.x * speed);
+    fpControls.moveForward(-dir.z * speed);
+
+    // Wall collision: try full move, else slide along one axis, else block.
+    const newX = camera.position.x;
+    const newZ = camera.position.z;
+    if (!isWalkablePosition(newX, newZ)) {
+        if (isWalkablePosition(newX, oldZ)) {
+            camera.position.z = oldZ;
+        } else if (isWalkablePosition(oldX, newZ)) {
+            camera.position.x = oldX;
+        } else {
+            camera.position.x = oldX;
+            camera.position.z = oldZ;
+        }
+    }
+
+    // Clamp to terrain
+    camera.position.y = 1.85;
+}
+
+/* ============================================
+   Minimap
+   ============================================ */
+
+function updateMinimap() {
+    const minimapCanvas = document.getElementById('minimap-canvas');
+    if (!minimapCanvas) return;
+    const ctx = minimapCanvas.getContext('2d');
+    const w = minimapCanvas.width;
+    const h = minimapCanvas.height;
+
+    ctx.fillStyle = 'rgba(10, 14, 23, 0.9)';
+    ctx.fillRect(0, 0, w, h);
+
+    const scale = 1.5;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    // Draw modules
+    if (state.habitatGroup) {
+        state.habitatGroup.traverse(child => {
+            if (child.userData.isDomeModule) {
+                const x = cx + child.position.x * scale;
+                const y = cy + child.position.z * scale;
+                const r = (child.userData.domeRadius || 4) * scale;
+
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(56, 189, 248, 0.2)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        });
+    }
+
+    // Draw camera position
+    const camX = cx + camera.position.x * scale;
+    const camY = cy + camera.position.z * scale;
+    ctx.beginPath();
+    ctx.arc(camX, camY, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#38bdf8';
+    ctx.fill();
+
+    // Camera direction indicator
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    ctx.beginPath();
+    ctx.moveTo(camX, camY);
+    ctx.lineTo(camX + dir.x * 10, camY + dir.z * 10);
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+}
+
+/* ============================================
+   Accessibility
+   ============================================ */
+
+function announce(text) {
+    const el = document.getElementById('a11y-live');
+    if (el) el.textContent = text;
+}
+
+/* ============================================
+   Crew Animation
+   ============================================ */
+
+function animateCrew(time) {
+    if (!state.crewGroup || !state.crewVisible) return;
+    state.crewGroup.children.forEach((member, i) => {
+        // Gentle idle sway
+        const offset = i * 1.5;
+        member.rotation.y = Math.sin(time * 0.5 + offset) * 0.15;
+        member.position.y = Math.sin(time * 0.8 + offset) * 0.03;
+    });
+}
+
+/* ============================================
+   Animation Loop
+   ============================================ */
+
+const clock = new THREE.Clock();
+
+function animate() {
+    requestAnimationFrame(animate);
+
+    const delta = clock.getDelta();
+    const elapsed = clock.getElapsedTime();
+
+    // Update controls
+    if (state.viewMode === 'overview' || state.viewMode === 'rearrange') {
+        orbitControls.update();
+    }
+
+    // Camera fly-to animation
+    updateCameraFly(delta);
+
+    // First-person movement
+    updateFirstPerson(delta);
+
+    // Motion sensors → sliding doors → doorway LED boost
+    updateMotionSensors(delta);
+    updateSlidingDoors(delta);
+    updateDoorwayBoost();
+
+    // Animate crew
+    animateCrew(elapsed);
+
+    // Sensor hotspot pulsing
+    pulseSensorHotspots(elapsed);
+
+    // Animated interior elements
+    animateInteriors(elapsed);
+
+    // Animated procedural window views (~10 Hz)
+    updateAnimatedViews(elapsed);
+
+    // Door sensor frame scan lines + node pulses
+    animateDoorSensors(elapsed);
+
+    // Particle drift
+    animateParticles(delta);
+
+    // Panel toggle transitions
+    animatePanelTransitions(delta);
+
+    // Snap-to-slot animation (rearrange mode)
+    updateSnapAnimation(delta);
+
+    // Minimap (~2 fps)
+    state.minimapTimer += delta;
+    if (state.minimapTimer > 0.5) {
+        state.minimapTimer = 0;
+        updateMinimap();
+    }
+
+    // Auto-refresh data (~every 5 seconds when playing)
+    if (state.playing) {
+        state.dataTimer += delta;
+        if (state.dataTimer > 5) {
+            state.dataTimer = 0;
+            refreshData();
+        }
+    }
+
+    // Audio volume modulation
+    updateAudio();
+
+    // Status warning pulse
+    pulseStatusWarnings(elapsed);
+
+    // Render with post-processing
+    composer.render();
+    labelRenderer.render(scene, camera);
+}
+
+/* ============================================
+   Resize
+   ============================================ */
+
+function onResize() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+    composer.setSize(w, h);
+    labelRenderer.setSize(w, h);
+}
+
+window.addEventListener('resize', onResize);
+
+/* ============================================
+   Init
+   ============================================ */
+
+/* ============================================
+   Loading Screen
+   ============================================ */
+
+function setLoadProgress(pct, msg) {
+    const fill = document.getElementById('loading-bar-fill');
+    const status = document.getElementById('loading-status');
+    if (fill) fill.style.width = `${pct}%`;
+    if (status) status.textContent = msg;
+}
+
+function hideLoadingScreen() {
+    const el = document.getElementById('loading-screen');
+    if (!el) return;
+    el.classList.add('fade-out');
+    setTimeout(() => el.remove(), 700);
+}
+
+/* ============================================
+   System Legend
+   ============================================ */
+
+function buildSystemLegend() {
+    const container = document.getElementById('system-legend');
+    if (!container) return;
+
+    container.innerHTML = '';
+    for (const group of SENSOR_GROUPS) {
+        const groupEl = document.createElement('div');
+        groupEl.className = 'legend-group';
+
+        const header = document.createElement('div');
+        header.className = 'legend-group-header';
+        header.style.color = group.color;
+        header.style.borderLeftColor = group.color;
+        header.textContent = group.name;
+        groupEl.appendChild(header);
+
+        if (group.subtitle) {
+            const sub = document.createElement('div');
+            sub.className = 'legend-group-subtitle';
+            sub.textContent = group.subtitle;
+            groupEl.appendChild(sub);
+        }
+
+        for (const sensorId of group.sensors) {
+            const meta = METRIC_META[sensorId];
+            if (!meta) continue;
+
+            const row = document.createElement('div');
+            row.className = 'legend-row';
+
+            const dot = document.createElement('span');
+            dot.className = 'legend-dot';
+            dot.style.background = meta.color;
+
+            const name = document.createElement('span');
+            name.className = 'legend-name';
+            name.innerHTML = `${meta.icon} ${meta.label}`;
+
+            row.append(dot, name);
+            groupEl.appendChild(row);
+        }
+
+        container.appendChild(groupEl);
+    }
+}
+
+function toggleSensorVisibility(sensorId, visible) {
+    if (!state._cached?.hotspots) return;
+    for (const h of state._cached.hotspots) {
+        if (h.userData.sensorId === sensorId) {
+            h.visible = visible;
+        }
+    }
+}
+
+/* ============================================
+   Interior Environment Map
+   ============================================ */
+
+function generateInteriorEnvMap() {
+    const S = 64;
+    const cv = document.createElement('canvas');
+    cv.width = S * 4; cv.height = S * 2; // equirectangular layout
+    const ctx = cv.getContext('2d');
+
+    // Upper half: dome interior — dark steel zenith fading to panel-gray horizon
+    const sky = ctx.createLinearGradient(0, 0, 0, S);
+    sky.addColorStop(0,   '#1a1d22'); // zenith — dark steel
+    sky.addColorStop(0.6, '#3a3d44'); // mid — panel gray
+    sky.addColorStop(1,   '#555966'); // horizon — lighter
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, S * 4, S);
+
+    // Lower half: floor gray
+    ctx.fillStyle = '#4a4f58';
+    ctx.fillRect(0, S, S * 4, S);
+
+    // 5 warm radial ceiling fixture blobs
+    const fixtures = [
+        [S * 0.5, S * 0.15], [S * 1.5, S * 0.1], [S * 2.5, S * 0.15],
+        [S * 3.5, S * 0.1],  [S * 2.0, S * 0.25]
+    ];
+    for (const [fx, fy] of fixtures) {
+        const g = ctx.createRadialGradient(fx, fy, 0, fx, fy, S * 0.35);
+        g.addColorStop(0, 'rgba(255,240,200,0.22)');
+        g.addColorStop(1, 'rgba(255,240,200,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, S * 4, S);
+    }
+
+    const equiTex = new THREE.CanvasTexture(cv);
+    equiTex.mapping = THREE.EquirectangularReflectionMapping;
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    pmrem.compileEquirectangularShader();
+    const env = pmrem.fromEquirectangular(equiTex).texture;
+    pmrem.dispose();
+    equiTex.dispose();
+    return env;
+}
+
+async function init() {
+    setLoadProgress(5, 'Generating terrain…');
+
+    // Data
+    refreshData();
+
+    // Terrain
+    state.terrainMesh = createTerrain();
+    scene.add(state.terrainMesh);
+    setLoadProgress(15, 'Creating starfield…');
+
+    // Starfield
+    state.starField = createStarfield();
+    scene.add(state.starField);
+
+    // Earth
+    scene.add(createEarth());
+
+    // Interior environment map — makes metal sheen + window reflections work
+    scene.environment = generateInteriorEnvMap();
+    scene.environmentIntensity = 0.4;
+
+    setLoadProgress(25, 'Building habitat modules…');
+
+    // Build habitat
+    state.habitatGroup = buildHabitat(state.layout);
+    scene.add(state.habitatGroup);
+    setLoadProgress(50, 'Furnishing interiors…');
+
+    // Furnish interiors
+    state.habitatGroup.traverse(child => {
+        if (child.userData.isDomeModule && child.userData.moduleType) {
+            furnishModule(child, child.userData.moduleType);
+        }
+    });
+    applyHandrailVisibility();
+    setLoadProgress(70, 'Populating crew…');
+
+    // Crew
+    state.crewGroup = createCrewGroup();
+    scene.add(state.crewGroup);
+
+    // Cache animated object refs (eliminates per-frame traversals)
+    cacheAnimatedObjects();
+    setLoadProgress(80, 'Setting up lighting…');
+
+    // Circadian lighting
+    updateCircadianLighting(state.missionTime);
+    updateCircadianFixtures(state.missionTime);
+
+    // HUD
+    initHUD();
+    updateWellbeingBadge();
+    buildSystemLegend();
+    setLoadProgress(90, 'Binding controls…');
+
+    // Events
+    canvas.addEventListener('click', onCanvasClick);
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', (e) => {
+        onPointerMove(e);
+        onHover(e);
+    });
+    canvas.addEventListener('pointerup', onPointerUp);
+    initFirstPersonKeys();
+
+    setLoadProgress(100, 'Ready');
+
+    // Start
+    animate();
+    hideLoadingScreen();
+
+    announce('Lunar Habitat 3D simulation loaded. Use controls to explore.');
+}
+
+init().catch(err => {
+    console.error('[Habitat3D] Init failed:', err);
+    setLoadProgress(100, `Error: ${err.message}`);
+    setTimeout(hideLoadingScreen, 1500);
+});

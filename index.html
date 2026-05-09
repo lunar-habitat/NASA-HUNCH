@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lunar Habitat — Crew Wellbeing Monitor</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body class="dark-theme">
+
+    <header class="site-header" role="banner">
+        <div class="header-brand">
+            <svg class="header-logo" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <polygon points="12,2 22,8.5 22,15.5 12,22 2,15.5 2,8.5" stroke="var(--color-accent)" stroke-width="1.5" fill="var(--color-accent-glow)" />
+            </svg>
+            <h1>Lunar Habitat <span class="subtitle">Crew Wellbeing Monitor</span></h1>
+        </div>
+        <div class="controls-bar">
+            <span class="controls-label text-accent">NASA HUNCH Concept Prototype</span>
+
+            <div class="controls-group">
+                <label for="scenario-select" class="control-label">Scenario</label>
+                <select id="scenario-select" class="control-select">
+                    <option value="baseline">Baseline</option>
+                    <option value="stress">Stress Spike</option>
+                    <option value="sleepDeprived">Sleep Deprived</option>
+                    <option value="exercise">High Activity</option>
+                    <option value="emergency">Emergency Alert</option>
+                    <option value="isolation">Social Isolation</option>
+                    <option value="eva">EVA (Extravehicular Activity)</option>
+                </select>
+            </div>
+
+            <div class="controls-group controls-group--import">
+                <button id="btn-import" class="control-btn" title="Import CSV or JSON data file">
+                    <svg class="icon icon--sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    Import Data
+                </button>
+                <input type="file" id="file-import" accept=".csv,.json" class="sr-only" aria-label="Choose CSV or JSON file to import">
+                <button id="btn-import-help" class="control-btn control-btn--icon" title="Show expected file format" aria-label="File format help">
+                    ?
+                </button>
+                <div id="import-badge" class="import-badge" hidden>
+                    <span id="import-filename" class="import-badge-name"></span>
+                    <button id="btn-import-clear" class="import-badge-clear" title="Clear imported data" aria-label="Clear imported data">
+                        <svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <button id="btn-regenerate" class="control-btn" title="Regenerate simulated data">
+                ↻ Regenerate
+            </button>
+
+            <button id="btn-play-pause" class="control-btn" title="Play/pause real-time simulation">
+                ▶ Play
+            </button>
+
+            <div class="controls-group">
+                <label for="privacy-toggle" class="control-label">Privacy</label>
+                <button id="privacy-toggle" class="control-toggle" role="switch" aria-checked="false" title="Toggle privacy mode — hide exact values">
+                    <span class="toggle-track">
+                        <span class="toggle-thumb"></span>
+                    </span>
+                    <span class="toggle-label">Off</span>
+                </button>
+            </div>
+
+            <div class="controls-group">
+                <button id="music-toggle" class="music-toggle-btn" role="switch" aria-checked="false" aria-label="Toggle background music" title="Toggle ambient music">
+                    <span class="music-icon"><svg class="icon icon--sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg></span>
+                    <span class="music-label">Music</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ===== Habitat 3D Hero Section ===== -->
+    <section id="habitat-hero" class="habitat-hero" aria-labelledby="habitat-hero-title">
+        <div class="habitat-hero__stars" aria-hidden="true"></div>
+        <div class="habitat-hero__content">
+            <span class="habitat-hero__badge">Primary Mission</span>
+            <h2 id="habitat-hero-title" class="habitat-hero__title">3D Lunar Habitat</h2>
+            <p class="habitat-hero__subtitle">Explore an interactive simulation of a modular lunar habitat.<br>Walk through crew quarters, monitor biometric sensors, and test environmental scenarios in real time.</p>
+            <a href="pages/habitat-3d.html" class="habitat-hero__cta">
+                <span class="habitat-hero__cta-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg></span>
+                Enter Habitat 3D
+            </a>
+        </div>
+        <div class="habitat-hero__features">
+            <div class="habitat-hero__card">
+                <span class="habitat-hero__card-icon" aria-hidden="true"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 6v12"/><path d="M2 12h20"/><path d="M6 6v12"/><path d="M18 6v12"/></svg></span>
+                <h3 class="habitat-hero__card-title">Immersive Walkthrough</h3>
+                <p class="habitat-hero__card-desc">Explore in orbital overview, first-person walk-through, or module rearrangement mode.</p>
+            </div>
+            <div class="habitat-hero__card">
+                <span class="habitat-hero__card-icon" aria-hidden="true"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/><polyline points="3 12 7 12 9 8 13 16 15 12 19 12"/></svg></span>
+                <h3 class="habitat-hero__card-title">Biometric Sensors</h3>
+                <p class="habitat-hero__card-desc">12 real-time biometric and behavioral sensors across 4 monitoring systems.</p>
+            </div>
+            <div class="habitat-hero__card">
+                <span class="habitat-hero__card-icon" aria-hidden="true"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6v5a3 3 0 0 1-6 0V3z"/><path d="M12 8v8"/><path d="M7 19c0-2.21 2.24-4 5-4s5 1.79 5 4"/><line x1="7" y1="19" x2="7" y2="21"/><line x1="17" y1="19" x2="17" y2="21"/><line x1="6" y1="21" x2="18" y2="21"/></svg></span>
+                <h3 class="habitat-hero__card-title">Scenario Simulation</h3>
+                <p class="habitat-hero__card-desc">7 preset scenarios including EVA, emergency alerts, sleep deprivation, and social isolation.</p>
+            </div>
+            <div class="habitat-hero__card">
+                <span class="habitat-hero__card-icon" aria-hidden="true"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+                <h3 class="habitat-hero__card-title">Crew Monitoring</h3>
+                <p class="habitat-hero__card-desc">Track wellbeing index, crew status, and circadian phase across a 24-hour cycle.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== Supporting Systems ===== -->
+    <div class="supporting-divider" aria-hidden="true">
+        <span class="supporting-divider__line"></span>
+        <span class="supporting-divider__label">Supporting Systems</span>
+        <span class="supporting-divider__line"></span>
+    </div>
+
+    <main id="main-content" class="main-layout">
+        <section id="wristband-panel" class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">HRV Monitoring Wristband</h2>
+                <p class="panel-subtitle">Design and Features</p>
+            </div>
+            <div class="wristband-display">
+                <!-- Wristband visualization — Phase 2 -->
+            </div>
+            <div class="sensor-list">
+                <!-- Sensor readings — Phase 2 -->
+            </div>
+            <span class="badge">Simulated sensor readings</span>
+        </section>
+        <section id="dashboard-panel" class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Monitoring Systems Analytics Dashboard</h2>
+                <p class="panel-subtitle">Real-time Crew Monitoring</p>
+            </div>
+            <div class="kpi-grid">
+                <!-- KPI cards — Phase 3 -->
+            </div>
+            <div class="charts-grid">
+                <!-- Charts — Phase 3 -->
+            </div>
+            <div class="insights-panel">
+                <!-- Insights — Phase 3 -->
+            </div>
+            <p class="placeholder-text">Dashboard metrics loading...</p>
+        </section>
+    </main>
+
+    <!-- Import format help popover -->
+    <div id="import-help-popover" class="import-help-popover" hidden role="dialog" aria-label="Data import format help">
+        <div class="import-help-content">
+            <div class="import-help-header">
+                <strong>Expected File Format</strong>
+                <button id="btn-close-help" class="import-badge-clear" aria-label="Close help">
+                    <svg class="icon icon--sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="import-help-body">
+                <p><strong>CSV</strong> — first row must be column headers, comma-separated.</p>
+                <p><strong>JSON</strong> — array of objects, or <code>{ "data": [...] }</code>.</p>
+                <table class="import-help-table">
+                    <thead><tr><th>Column</th><th>Range</th><th>Required</th></tr></thead>
+                    <tbody>
+                        <tr><td>timestamp</td><td>ISO 8601</td><td>No</td></tr>
+                        <tr><td>heartRateBpm</td><td>40–180</td><td>Yes*</td></tr>
+                        <tr><td>hrvMs</td><td>10–150</td><td>Yes*</td></tr>
+                        <tr><td>edaMicrosiemens</td><td>0.1–10.0</td><td>Yes*</td></tr>
+                        <tr><td>skinTempC</td><td>30.0–38.0</td><td>Yes*</td></tr>
+                        <tr><td>activityScore</td><td>0–100</td><td>Yes*</td></tr>
+                        <tr><td>sleepMinutes</td><td>0–600</td><td>Yes*</td></tr>
+                        <tr><td>restlessnessScore</td><td>0–100</td><td>Yes*</td></tr>
+                        <tr><td>pupilDilationMm</td><td>2.0–8.0</td><td>No</td></tr>
+                        <tr><td>socialScore</td><td>0–100</td><td>No</td></tr>
+                        <tr><td>routineDeviation</td><td>0–100</td><td>No</td></tr>
+                        <tr><td>cognitiveLoad</td><td>0–100</td><td>No</td></tr>
+                        <tr><td>sleepQuality</td><td>0–100</td><td>No</td></tr>
+                        <tr><td>circadianAlignment</td><td>0–100</td><td>No</td></tr>
+                        <tr><td>lightSpectrumScore</td><td>0–100</td><td>No</td></tr>
+                        <tr><td>greeneryExposureMin</td><td>0–120</td><td>No</td></tr>
+                        <tr><td>natureSoundscapeScore</td><td>0–100</td><td>No</td></tr>
+                        <tr><td>windowSimStatus</td><td>0–100</td><td>No</td></tr>
+                    </tbody>
+                </table>
+                <p class="import-help-note">*At least one biometric column is required. Missing columns use defaults. Aliases accepted: hr, hrv, eda, temp, activity, sleep, restlessness, pupil, social, routine, cognitive, circadian, spectrum, greenery, soundscape, window.</p>
+                <p><a href="assets/data/sample-data.csv" download class="import-help-link">⬇ Download sample CSV template</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import toast notifications -->
+    <div id="import-toast" class="import-toast" hidden role="alert" aria-live="assertive"></div>
+
+    <footer class="site-footer">
+        Concept prototype — simulated data only. Not medical advice or diagnostic tool.
+    </footer>
+
+    <div id="a11y-live" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+
+    <noscript>
+        <p>JavaScript is required to run the Lunar Habitat Crew Wellbeing Monitor. Please enable JavaScript in your browser.</p>
+    </noscript>
+
+    <script type="module" src="scripts/app.js"></script>
+</body>
+</html>
